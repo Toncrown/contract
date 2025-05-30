@@ -9,7 +9,8 @@
         "release": "blueprint pack && npm publish --access public"
     },
     "dependencies": {
-        "@ton/core": "~0"
+        "@ton/core": "~0",
+        "blueprint": "^0.x.x"
     },
     "devDependencies": {
         "@ton/blueprint": ">=0.34.0",
