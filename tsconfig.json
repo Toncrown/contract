@@ -1,12 +1,30 @@
 {
     "compilerOptions": {
         "target": "ES2020",
-        "outDir": "dist",
+        "outDir": "dist", // This is usually for library output, not always relevant for tests if you use ts-jest
         "module": "commonjs",
-        "declaration": true,
+        "declaration": true, // Also usually for library output
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
         "strict": true,
-        "skipLibCheck": true
-    }
+        "skipLibCheck": true,
+        "moduleResolution": "node", // Explicitly add this for robust module resolution
+        "types": [ // <<< --- ADD THIS SECTION ---
+            "jest",          // Or your test runner's types (e.g., "mocha")
+            "node",          // For Node.js built-in types
+            "@ton/sandbox"   // For SandboxContract and related types
+        ],
+        "lib": ["ES2020", "DOM"] // Added DOM for broader compatibility if any web-like Promise typings are used by dependencies
+    },
+    "include": [ // <<< --- CONSIDER ADDING/ADJUSTING THIS ---
+        "tests/**/*.ts",    // Path to your test files
+        "wrappers/**/*.ts", // Path to your contract wrappers (if not in build)
+        "scripts/**/*.ts",  // Path to your deploy/interaction scripts
+        "build/**/*.ts"     // Path to generated wrappers if in build directory
+, "blueprint.config.ts"        // Add any other directories containing TypeScript files you want checked
+    ],
+    "exclude": [ // <<< --- GOOD TO HAVE ---
+        "node_modules",
+        "dist" // Exclude your output directory from being re-parsed
+    ]
 }

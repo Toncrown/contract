@@ -1,0 +1,2144 @@
+#pragma version =0.4.6;
+#pragma allow-post-modification;
+#pragma compute-asm-ltr;
+
+;; ton_crown.tact_TonCrown.headers.fc
+;;
+;; Header files for TonCrown
+;; NOTE: declarations are sorted for optimal order
+;;
+
+;; __tact_load_address_opt
+(slice, slice) __tact_load_address_opt(slice cs) inline;
+
+;; __tact_store_address_opt
+builder __tact_store_address_opt(builder b, slice address) inline;
+
+;; __tact_not_null
+forall X -> X __tact_not_null(X x) impure inline;
+
+;; __tact_context_get
+(int, slice, int, slice) __tact_context_get() inline;
+
+;; __tact_context_get_sender
+slice __tact_context_get_sender() inline;
+
+;; __tact_string_builder_start
+tuple __tact_string_builder_start(builder b) inline;
+
+;; __tact_string_builder_start_comment
+tuple __tact_string_builder_start_comment() inline;
+
+;; __tact_string_builder_start_string
+tuple __tact_string_builder_start_string() inline;
+
+;; __tact_string_builder_end
+cell __tact_string_builder_end(tuple builders) inline;
+
+;; __tact_string_builder_end_slice
+slice __tact_string_builder_end_slice(tuple builders) inline;
+
+;; __tact_string_builder_append
+((tuple), ()) __tact_string_builder_append(tuple builders, slice sc) inline_ref;
+
+;; __tact_string_builder_append_not_mut
+(tuple) __tact_string_builder_append_not_mut(tuple builders, slice sc) inline_ref;
+
+;; __tact_dict_get_slice_cell
+cell __tact_dict_get_slice_cell(cell d, int kl, slice k) inline;
+
+;; __tact_dict_set_slice_cell
+(cell, ()) __tact_dict_set_slice_cell(cell d, int kl, slice k, cell v) inline;
+
+;; __tact_dict_get_int_int
+int __tact_dict_get_int_int(cell d, int kl, int k, int vl) inline;
+
+;; __tact_dict_set_int_int
+(cell, ()) __tact_dict_set_int_int(cell d, int kl, int k, int v, int vl) inline;
+
+;; __tact_dict_get_int_cell
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline;
+
+;; __tact_dict_set_int_cell
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline;
+
+;; $Deploy$_load_without_opcode
+(slice, ((int))) $Deploy$_load_without_opcode(slice sc_0) inline;
+
+;; $DeployOk$_store
+builder $DeployOk$_store(builder build_0, (int) v) inline;
+
+;; $DeployOk$_store_cell
+cell $DeployOk$_store_cell((int) v) inline;
+
+;; $ChangeOwner$_load_without_opcode
+(slice, ((int, slice))) $ChangeOwner$_load_without_opcode(slice sc_0) inline;
+
+;; $ChangeOwnerOk$_store
+builder $ChangeOwnerOk$_store(builder build_0, (int, slice) v) inline;
+
+;; $ChangeOwnerOk$_store_cell
+cell $ChangeOwnerOk$_store_cell((int, slice) v) inline;
+
+;; $User$_store
+builder $User$_store(builder build_0, (slice, slice, int, int, int, int, int, int, int, int, int, int) v) inline_ref;
+
+;; $User$_store_cell
+cell $User$_store_cell((slice, slice, int, int, int, int, int, int, int, int, int, int) v) inline;
+
+;; $User$_load
+(slice, ((slice, slice, int, int, int, int, int, int, int, int, int, int))) $User$_load(slice sc_0) inline_ref;
+
+;; $User$_as_optional
+tuple $User$_as_optional((slice, slice, int, int, int, int, int, int, int, int, int, int) v) inline;
+
+;; $User$_load_opt
+tuple $User$_load_opt(cell cl) inline;
+
+;; $StakeInfo$_store
+builder $StakeInfo$_store(builder build_0, (int, int, int, int, int, int, int, int) v) inline;
+
+;; $StakeInfo$_store_cell
+cell $StakeInfo$_store_cell((int, int, int, int, int, int, int, int) v) inline;
+
+;; $StakeInfo$_load
+(slice, ((int, int, int, int, int, int, int, int))) $StakeInfo$_load(slice sc_0) inline;
+
+;; $StakeInfo$_as_optional
+tuple $StakeInfo$_as_optional((int, int, int, int, int, int, int, int) v) inline;
+
+;; $StakeInfo$_load_opt
+tuple $StakeInfo$_load_opt(cell cl) inline;
+
+;; $VipConfig$_store
+builder $VipConfig$_store(builder build_0, (int, int, int, int) v) inline;
+
+;; $VipConfig$_store_cell
+cell $VipConfig$_store_cell((int, int, int, int) v) inline;
+
+;; $VipConfig$_load
+(slice, ((int, int, int, int))) $VipConfig$_load(slice sc_0) inline;
+
+;; $VipConfig$_as_optional
+tuple $VipConfig$_as_optional((int, int, int, int) v) inline;
+
+;; $VipConfig$_load_opt
+tuple $VipConfig$_load_opt(cell cl) inline;
+
+;; $ReferralNode$_store
+builder $ReferralNode$_store(builder build_0, (slice, int, int) v) inline;
+
+;; $ReferralNode$_store_cell
+cell $ReferralNode$_store_cell((slice, int, int) v) inline;
+
+;; $ReferralNode$_load
+(slice, ((slice, int, int))) $ReferralNode$_load(slice sc_0) inline;
+
+;; $ReferralNode$_as_optional
+tuple $ReferralNode$_as_optional((slice, int, int) v) inline;
+
+;; $ReferralNode$_load_opt
+tuple $ReferralNode$_load_opt(cell cl) inline;
+
+;; $Register$_load_without_opcode
+(slice, ((slice))) $Register$_load_without_opcode(slice sc_0) inline;
+
+;; $UpgradeLevel$_load_without_opcode
+(slice, ((int))) $UpgradeLevel$_load_without_opcode(slice sc_0) inline;
+
+;; $CheckIn$_load_without_opcode
+(slice, (tuple)) $CheckIn$_load_without_opcode(slice sc_0) inline;
+
+;; $StakeTON$_load_without_opcode
+(slice, ((int, int))) $StakeTON$_load_without_opcode(slice sc_0) inline;
+
+;; $ClaimStakingRewards$_load_without_opcode
+(slice, (tuple)) $ClaimStakingRewards$_load_without_opcode(slice sc_0) inline;
+
+;; $UnstakeTON$_load_without_opcode
+(slice, (tuple)) $UnstakeTON$_load_without_opcode(slice sc_0) inline;
+
+;; $ClaimPendingRewards$_load_without_opcode
+(slice, (tuple)) $ClaimPendingRewards$_load_without_opcode(slice sc_0) inline;
+
+;; $SetCreatorWallet$_load_without_opcode
+(slice, ((int, slice))) $SetCreatorWallet$_load_without_opcode(slice sc_0) inline;
+
+;; $UpdateVipConfig$_load_without_opcode
+(slice, ((int, (int, int, int, int)))) $UpdateVipConfig$_load_without_opcode(slice sc_0) inline;
+
+;; $UpdateLevelCost$_load_without_opcode
+(slice, ((int, int))) $UpdateLevelCost$_load_without_opcode(slice sc_0) inline;
+
+;; $EmergencyPause$_load_without_opcode
+(slice, ((int))) $EmergencyPause$_load_without_opcode(slice sc_0) inline;
+
+;; $TonCrown$_store
+builder $TonCrown$_store(builder build_0, (slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) v) inline;
+
+;; $TonCrown$_load
+(slice, ((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int))) $TonCrown$_load(slice sc_0) inline;
+
+;; $Context$_get_value
+_ $Context$_get_value((int, slice, int, slice) v) inline;
+
+;; $User$_get_isActive
+_ $User$_get_isActive((slice, slice, int, int, int, int, int, int, int, int, int, int) v) inline;
+
+;; $User$_not_null
+((slice, slice, int, int, int, int, int, int, int, int, int, int)) $User$_not_null(tuple v) inline;
+
+;; $User$_to_tuple
+tuple $User$_to_tuple(((slice, slice, int, int, int, int, int, int, int, int, int, int)) v) inline;
+
+;; $User$_to_opt_tuple
+tuple $User$_to_opt_tuple(tuple v) inline;
+
+;; $User$_to_opt_external
+tuple $User$_to_opt_external(tuple v) inline;
+
+;; $StakeInfo$_get_isActive
+_ $StakeInfo$_get_isActive((int, int, int, int, int, int, int, int) v) inline;
+
+;; $StakeInfo$_not_null
+((int, int, int, int, int, int, int, int)) $StakeInfo$_not_null(tuple v) inline;
+
+;; $StakeInfo$_to_tuple
+tuple $StakeInfo$_to_tuple(((int, int, int, int, int, int, int, int)) v) inline;
+
+;; $StakeInfo$_to_opt_tuple
+tuple $StakeInfo$_to_opt_tuple(tuple v) inline;
+
+;; $StakeInfo$_to_opt_external
+tuple $StakeInfo$_to_opt_external(tuple v) inline;
+
+;; $VipConfig$_get_stakingRoi
+_ $VipConfig$_get_stakingRoi((int, int, int, int) v) inline;
+
+;; $VipConfig$_not_null
+((int, int, int, int)) $VipConfig$_not_null(tuple v) inline;
+
+;; $VipConfig$_to_tuple
+tuple $VipConfig$_to_tuple(((int, int, int, int)) v) inline;
+
+;; $VipConfig$_to_opt_tuple
+tuple $VipConfig$_to_opt_tuple(tuple v) inline;
+
+;; $VipConfig$_to_opt_external
+tuple $VipConfig$_to_opt_external(tuple v) inline;
+
+;; $ReferralNode$_not_null
+((slice, int, int)) $ReferralNode$_not_null(tuple v) inline;
+
+;; $ReferralNode$_to_tuple
+tuple $ReferralNode$_to_tuple(((slice, int, int)) v) inline;
+
+;; $ReferralNode$_to_opt_tuple
+tuple $ReferralNode$_to_opt_tuple(tuple v) inline;
+
+;; $ReferralNode$_to_opt_external
+tuple $ReferralNode$_to_opt_external(tuple v) inline;
+
+;; $PlatformStats$_to_external
+(int, int, int, int) $PlatformStats$_to_external(((int, int, int, int)) v) inline;
+
+;; $TonCrown$init$_load
+(slice, ((slice))) $TonCrown$init$_load(slice sc_0) inline;
+
+;; $VipConfig$_constructor_dailyRoi_minLevel_maxLevel_stakingRoi
+((int, int, int, int)) $VipConfig$_constructor_dailyRoi_minLevel_maxLevel_stakingRoi(int $dailyRoi, int $minLevel, int $maxLevel, int $stakingRoi) inline;
+
+;; $TonCrown$_contract_init
+(slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $TonCrown$_contract_init(slice $owner) impure inline;
+
+;; $TonCrown$_contract_load
+(slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $TonCrown$_contract_load() impure inline;
+
+;; $TonCrown$_contract_store
+() $TonCrown$_contract_store((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) v) impure inline;
+
+;; $String$_fun_asComment
+cell $String$_fun_asComment(slice $self) impure inline_ref;
+
+;; $TonCrown$_fun_requireNotPaused
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_requireNotPaused((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref;
+
+;; $TonCrown$_fun_requireUserExists
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), (slice, slice, int, int, int, int, int, int, int, int, int, int)) $TonCrown$_fun_requireUserExists((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, slice $user) impure inline_ref;
+
+;; $ReferralNode$_constructor_referrer_referralIndex_depth
+((slice, int, int)) $ReferralNode$_constructor_referrer_referralIndex_depth(slice $referrer, int $referralIndex, int $depth) inline;
+
+;; $TonCrown$_fun_processReferralRegistration
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_processReferralRegistration((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, slice $newUser, slice $referrer) impure inline_ref;
+
+;; $TonCrown$_fun_calculateVipClass
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), int) $TonCrown$_fun_calculateVipClass((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $level) impure inline_ref;
+
+;; $SendParameters$_constructor_to_value_mode_body
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_body(slice $to, int $value, int $mode, cell $body) inline;
+
+;; $TonCrown$_fun_distributeUplineReward
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_distributeUplineReward((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $amount, slice $upline, int $depth) impure inline_ref;
+
+;; $TonCrown$_fun_distributeLevelFees
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_distributeLevelFees((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $amount, slice $payer) impure inline_ref;
+
+;; $TonCrown$_fun_distributeLevelRenewalBonus
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_distributeLevelRenewalBonus((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $amount, slice $referrer) impure inline_ref;
+
+;; $TonCrown$_fun_getUserInfo
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), tuple) $TonCrown$_fun_getUserInfo((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, slice $address) impure inline_ref;
+
+;; $TonCrown$_fun_getStakeInfo
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), tuple) $TonCrown$_fun_getStakeInfo((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, slice $address) impure inline_ref;
+
+;; $PlatformStats$_constructor_totalUsers_totalStaked_totalDistributed_activeStakes
+((int, int, int, int)) $PlatformStats$_constructor_totalUsers_totalStaked_totalDistributed_activeStakes(int $totalUsers, int $totalStaked, int $totalDistributed, int $activeStakes) inline;
+
+;; $TonCrown$_fun_getPlatformStats
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), (int, int, int, int)) $TonCrown$_fun_getPlatformStats((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref;
+
+;; $TonCrown$_fun_getLevelCost
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), int) $TonCrown$_fun_getLevelCost((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $level) impure inline_ref;
+
+;; $TonCrown$_fun_getVipConfig
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), tuple) $TonCrown$_fun_getVipConfig((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $vipClass) impure inline_ref;
+
+;; $TonCrown$_fun_getReferralNode
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), tuple) $TonCrown$_fun_getReferralNode((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, slice $address) impure inline_ref;
+
+;; $TonCrown$_fun_getCreatorWallet
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), slice) $TonCrown$_fun_getCreatorWallet((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $walletId) impure inline_ref;
+
+;; $TonCrown$_fun_getContractBalance
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), int) $TonCrown$_fun_getContractBalance((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref;
+
+;; $TonCrown$_fun_isPaused
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), int) $TonCrown$_fun_isPaused((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref;
+
+;; $MessageParameters$_constructor_bounce_to_value_mode_body
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline;
+
+;; $TonCrown$_fun_reply
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_reply((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, cell $body) impure inline;
+
+;; $TonCrown$_fun_notify
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_notify((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, cell $body) impure inline;
+
+;; $TonCrown$_fun_requireOwner
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_requireOwner((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref;
+
+;; $TonCrown$_fun_owner
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), slice) $TonCrown$_fun_owner((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref;
+
+;; $User$_constructor_address_referrer_level_vipClass_directReferrals_totalReferrals_lastCheckIn_levelExpiration_totalEarned_pendingRewards_isActive_registrationTime
+((slice, slice, int, int, int, int, int, int, int, int, int, int)) $User$_constructor_address_referrer_level_vipClass_directReferrals_totalReferrals_lastCheckIn_levelExpiration_totalEarned_pendingRewards_isActive_registrationTime(slice $address, slice $referrer, int $level, int $vipClass, int $directReferrals, int $totalReferrals, int $lastCheckIn, int $levelExpiration, int $totalEarned, int $pendingRewards, int $isActive, int $registrationTime) inline;
+
+;; $StakeInfo$_constructor_amount_startTime_duration_vipClass_autoRestake_lastClaim_totalClaimed_isActive
+((int, int, int, int, int, int, int, int)) $StakeInfo$_constructor_amount_startTime_duration_vipClass_autoRestake_lastClaim_totalClaimed_isActive(int $amount, int $startTime, int $duration, int $vipClass, int $autoRestake, int $lastClaim, int $totalClaimed, int $isActive) inline;
+
+;; $DeployOk$_constructor_queryId
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline;
+
+;; $ChangeOwnerOk$_constructor_queryId_newOwner
+((int, slice)) $ChangeOwnerOk$_constructor_queryId_newOwner(int $queryId, slice $newOwner) inline;
+
+
+;; ton_crown.tact_TonCrown.stdlib.fc
+global (int, slice, int, slice) __tact_context;
+global slice __tact_context_sender;
+global cell __tact_child_contract_codes;
+global int __tact_randomized;
+
+(slice, slice) __tact_load_address_opt(slice cs) inline {
+    if (cs.preload_uint(2) != 0) {
+        slice raw = cs~load_msg_addr();
+        return (cs, raw);
+    } else {
+        cs~skip_bits(2);
+        return (cs, null());
+    }
+}
+
+builder __tact_store_addr_none(builder b) asm "b{00} STSLICECONST";
+
+builder __tact_store_address_opt(builder b, slice address) inline {
+    if (null?(address)) {
+        return __tact_store_addr_none(b);
+    } else {
+        return b.store_slice(address);
+    }
+}
+
+forall X -> X __tact_not_null(X x) impure inline {
+    throw_if(128, null?(x)); return x;
+}
+
+(cell, int) __tact_dict_delete(cell dict, int key_len, slice index) asm(index dict key_len) """
+    DICTDEL
+""";
+
+((cell), ()) __tact_dict_set_ref(cell dict, int key_len, slice index, cell value) asm(value index dict key_len) """
+    DICTSETREF
+""";
+
+(cell, int) __tact_dict_get_ref(cell dict, int key_len, slice index) asm(index dict key_len) """
+    DICTGETREF NULLSWAPIFNOT
+""";
+
+(int, slice, int, slice) __tact_context_get() inline {
+    return __tact_context;
+}
+
+slice __tact_context_get_sender() inline {
+    return __tact_context_sender;
+}
+
+forall X0, X1, X2 -> tuple __tact_tuple_create_3((X0, X1, X2) v) asm """
+    3 TUPLE
+""";
+
+forall X0, X1, X2 -> (X0, X1, X2) __tact_tuple_destroy_3(tuple v) asm """
+    3 UNTUPLE
+""";
+
+forall X0, X1, X2, X3 -> tuple __tact_tuple_create_4((X0, X1, X2, X3) v) asm """
+    4 TUPLE
+""";
+
+forall X0, X1, X2, X3 -> (X0, X1, X2, X3) __tact_tuple_destroy_4(tuple v) asm """
+    4 UNTUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7 -> tuple __tact_tuple_create_8((X0, X1, X2, X3, X4, X5, X6, X7) v) asm """
+    8 TUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7 -> (X0, X1, X2, X3, X4, X5, X6, X7) __tact_tuple_destroy_8(tuple v) asm """
+    8 UNTUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11 -> tuple __tact_tuple_create_12((X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11) v) asm """
+    12 TUPLE
+""";
+
+forall X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11 -> (X0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11) __tact_tuple_destroy_12(tuple v) asm """
+    12 UNTUPLE
+""";
+
+tuple __tact_string_builder_start(builder b) inline {
+    return tpush(tpush(empty_tuple(), b), null());
+}
+
+tuple __tact_string_builder_start_comment() inline {
+    return __tact_string_builder_start(begin_cell().store_uint(0, 32));
+}
+
+tuple __tact_string_builder_start_string() inline {
+    return __tact_string_builder_start(begin_cell());
+}
+
+cell __tact_string_builder_end(tuple builders) inline {
+    (builder b, tuple tail) = uncons(builders);
+    cell c = b.end_cell();
+    while(~ null?(tail)) {
+        (b, tail) = uncons(tail);
+        c = b.store_ref(c).end_cell();
+    }
+    return c;
+}
+
+slice __tact_string_builder_end_slice(tuple builders) inline {
+    return __tact_string_builder_end(builders).begin_parse();
+}
+
+((tuple), ()) __tact_string_builder_append(tuple builders, slice sc) inline_ref {
+    int sliceRefs = slice_refs(sc);
+    int sliceBits = slice_bits(sc);
+
+    while((sliceBits > 0) | (sliceRefs > 0)) {
+
+        ;; Load the current builder
+        (builder b, tuple tail) = uncons(builders);
+        int remBytes = 127 - (builder_bits(b) / 8);
+        int exBytes = sliceBits / 8;
+
+        ;; Append bits
+        int amount = min(remBytes, exBytes);
+        if (amount > 0) {
+            slice read = sc~load_bits(amount * 8);
+            b = b.store_slice(read);
+        }
+
+        ;; Update builders
+        builders = cons(b, tail);
+
+        ;; Check if we need to add a new cell and continue
+        if (exBytes - amount > 0) {
+            var bb = begin_cell();
+            builders = cons(bb, builders);
+            sliceBits = (exBytes - amount) * 8;
+        } elseif (sliceRefs > 0) {
+            sc = sc~load_ref().begin_parse();
+            sliceRefs = slice_refs(sc);
+            sliceBits = slice_bits(sc);
+        } else {
+            sliceBits = 0;
+            sliceRefs = 0;
+        }
+    }
+
+    return ((builders), ());
+}
+
+(tuple) __tact_string_builder_append_not_mut(tuple builders, slice sc) inline_ref {
+    builders~__tact_string_builder_append(sc);
+    return builders;
+}
+
+cell __tact_dict_get_slice_cell(cell d, int kl, slice k) inline {
+    var (r, ok) = __tact_dict_get_ref(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_slice_cell(cell d, int kl, slice k, cell v) inline {
+    if (null?(v)) {
+        var (r, ok) = __tact_dict_delete(d, kl, k);
+        return (r, ());
+    } else {
+        return __tact_dict_set_ref(d, kl, k, v);
+    }
+}
+
+int __tact_dict_get_int_int(cell d, int kl, int k, int vl) inline {
+    var (r, ok) = idict_get?(d, kl, k);
+    if (ok) {
+        return r~load_int(vl);
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_int_int(cell d, int kl, int k, int v, int vl) inline {
+    if (null?(v)) {
+        var (r, ok) = idict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (idict_set_builder(d, kl, k, begin_cell().store_int(v, vl)), ());
+    }
+}
+
+cell __tact_dict_get_int_cell(cell d, int kl, int k) inline {
+    var (r, ok) = idict_get_ref?(d, kl, k);
+    if (ok) {
+        return r;
+    } else {
+        return null();
+    }
+}
+
+(cell, ()) __tact_dict_set_int_cell(cell d, int kl, int k, cell v) inline {
+    if (null?(v)) {
+        var (r, ok) = idict_delete?(d, kl, k);
+        return (r, ());
+    } else {
+        return (idict_set_ref(d, kl, k, v), ());
+    }
+}
+
+int $global_myBalance() impure asm """
+    BALANCE FIRST
+""";
+
+() $global_nativeReserve(int $amount, int $mode) impure asm """
+    RAWRESERVE
+""";
+
+() $global_message((int, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    106 PUSHINT         // 1 + 4 + 4 + 64 + 32 + 1
+    STZEROES
+    // → Stack state
+    // s0: Builder
+    // s1: `body`
+    // s2: `mode`
+    STDICT
+    ENDC
+    SWAP
+    SENDRAWMSG
+""";
+
+() $global_send((int, cell, cell, cell, int, slice, int) $params) impure asm """
+    NEWC
+    b{01} STSLICECONST  // store tag = $0 and ihr_disabled = true
+    1 STI               // store `bounce`
+    b{000} STSLICECONST // store bounced = false and src = addr_none
+    STSLICE             // store `to`
+    SWAP
+    STGRAMS             // store `value`
+    105 PUSHINT         // 1 + 4 + 4 + 64 + 32
+    STZEROES            // store currency_collection, ihr_fee, fwd_fee, created_lt and created_at
+    // → Stack state
+    // s0: Builder
+    // s1: `data`
+    // s2: `code`
+    // s3: `body`
+    // s4: `mode`
+
+    // Group 2: Placing the Builder after code and data, then checking those for nullability
+    s2 XCHG0
+    DUP2
+    ISNULL
+    SWAP
+    ISNULL
+    AND
+    // → Stack state
+    // s0: -1 (true) if `data` and `code` are both null, 0 (false) otherwise
+    // s1: `code`
+    // s2: `data`
+    // s3: Builder
+    // s4: `body`
+    // s5: `mode`
+
+    // Group 3: Left branch of the IFELSE, executed if s0 is -1 (true)
+    <{
+        DROP2 // drop `data` and `code`, since either of those is null
+        b{0} STSLICECONST
+    }> PUSHCONT
+
+    // Group 3: Right branch of the IFELSE, executed if s0 is 0 (false)
+    <{
+        // _ split_depth:(Maybe (## 5))
+        //   special:(Maybe TickTock)
+        //   code:(Maybe ^Cell)
+        //   data:(Maybe ^Cell)
+        //   library:(Maybe ^Cell)
+        // = StateInit;
+        ROT                // place message Builder on top
+        b{10} STSLICECONST // store Maybe = true, Either = false
+        // Start composing inlined StateInit
+        b{00} STSLICECONST // store split_depth and special first
+        STDICT             // store code
+        STDICT             // store data
+        b{0} STSLICECONST  // store library
+    }> PUSHCONT
+
+    // Group 3: IFELSE that does the branching shown above
+    IFELSE
+    // → Stack state
+    // s0: Builder
+    // s1: null or StateInit
+    // s2: `body`
+    // s3: `mode`
+
+    // Group 4: Finalizing the message
+    STDICT // store `body` as ref with an extra Maybe bit, since `body` might be null
+    ENDC
+    // → Stack state
+    // s0: Cell
+    // s1: `mode`
+
+    // Group 5: Sending the message, with `mode` on top
+    SWAP
+    SENDRAWMSG // https://github.com/tact-lang/tact/issues/1558
+""";
+
+int $global_now() impure asm """
+    NOW
+""";
+
+slice $Int$_fun_toString(int $self) impure asm """
+    <{
+        // x
+        NEWC // x b
+        OVER // x b x
+        0 LESSINT // x b <0?
+        <{
+            // x b
+            45 PUSHINT // x b 45
+            SWAP // x 45 b
+            8 STU // x b
+            SWAP // b x
+            NEGATE // b -x
+            SWAP // -x b
+        }>CONT IF
+        // x b
+
+        SWAP // b x
+
+        <{
+            // b x
+            10 PUSHINT DIVMOD // b x/10 x%10
+            48 ADDCONST // b x/10 (x%10+48)
+            s2 s2 s0 XC2PU ISZERO // (x%10+48) b x/10 x/10==0?
+        }>CONT UNTIL
+        // ... b x
+
+        DROP // ... b
+        DEPTH DEC // ... b n
+        <{ 8 STU }>CONT REPEAT // b
+    }>CONT 1 1 CALLXARGS
+    // b
+
+    ENDC CTOS // s
+""";
+
+cell $String$_fun_asComment(slice $self) impure inline_ref {
+    var ($self) = $self;
+    tuple $b = __tact_string_builder_start_comment();
+    $b~__tact_string_builder_append($self);
+    return __tact_string_builder_end($b);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_reply((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, cell $body) impure inline {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    slice $to = __tact_context_get_sender();
+    int $bounce = true;
+    if (false) {
+        int $balance = $global_myBalance();
+        int $balanceBeforeMessage = ($balance - $Context$_get_value(__tact_context_get()));
+        if (($balanceBeforeMessage < 0)) {
+            $global_nativeReserve(0, 0);
+            $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 130, $body));
+            return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+        }
+    }
+    $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 66, $body));
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_notify((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, cell $body) impure inline {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    slice $to = __tact_context_get_sender();
+    int $bounce = false;
+    if (false) {
+        int $balance = $global_myBalance();
+        int $balanceBeforeMessage = ($balance - $Context$_get_value(__tact_context_get()));
+        if (($balanceBeforeMessage < 0)) {
+            $global_nativeReserve(0, 0);
+            $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 130, $body));
+            return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+        }
+    }
+    $global_message($MessageParameters$_constructor_bounce_to_value_mode_body($bounce, $to, 0, 66, $body));
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_requireOwner((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    throw_unless(132, ( equal_slices_bits($self'owner, __tact_context_get_sender()) ));
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), slice) $TonCrown$_fun_owner((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    var $fresh$ret_18 = $self'owner;
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_18);
+}
+
+;; ton_crown.tact_TonCrown.constants.fc
+;; EQD8W3W7eQ7b3drJcSfAqwf8DM47W2LNZn_V3UirGI0NptdV
+slice __gen_slice_address_785a41f82b0ad3c3299817c6da3cea540d9c43c1db5abfabf74a3a746af8c9ae() asm """
+    B{b5ee9c72410101010024000043801f8b6eb76f21db7bbb592e24f81560ff8199c76b6c59accffabba9156311a1b4d04e503811} B>boc <s PUSHSLICE
+""";
+
+;; EQCtNZf0MCqmy558C2zgtzK7i69gg0ttOBWmZ-88ScJp4xb8
+slice __gen_slice_address_a6975a9ddb0d3779bd0f354bff10f854b7879cb75ad0d73235c97e63dc1e6e41() asm """
+    B{b5ee9c724101010100240000438015a6b2fe860554d973cf816d9c16e6577175ec10696da702b4ccfde789384d3c701b198347} B>boc <s PUSHSLICE
+""";
+
+;; EQBsxkLE-YTsKmBvnJXe3iqiWEcXG2qgHAJO63fIlRgu8-qN
+slice __gen_slice_address_29eb769c2f7c932291649aa4dd5e7157445e31d2b3411136b0165229212e423c() asm """
+    B{b5ee9c72410101010024000043800d98c8589f309d854c0df392bbdbc5544b08e2e36d54038049dd6ef912a305de705650cedc} B>boc <s PUSHSLICE
+""";
+
+;; EQBFBsujrE0xuce2GpculL_G-T5gXXTYF-3GisiacICLZ9Kt
+slice __gen_slice_address_fac1ea208cd5482e97a4ffac20a2d5affc032fb746ffaba05c37976ef7d030d1() asm """
+    B{b5ee9c724101010100240000438008a0d9747589a63738f6c352e5d297f8df27cc0bae9b02fdb8d159134e10116cf0c66fbc91} B>boc <s PUSHSLICE
+""";
+
+;; Cell bi1mcxK6gDc4cjSK+yjIGjD3dcYkUUqmMaSdRWkH7Hk=
+cell __gen_cell_cell_6e2d667312ba80373872348afb28c81a30f775c624514aa631a49d456907ec79() asm """
+    B{b5ee9c724101010100130000220000000043726561746f722073686172657ad3ceb2} B>boc PUSHREF
+""";
+
+;; Cell BMqaEluoyn82diVIYPKArJJ69+6/PNRZK72bAVm0TrU=
+cell __gen_cell_cell_04ca9a125ba8ca7f3676254860f280ac927af7eebf3cd4592bbd9b0159b44eb5() asm """
+    B{b5ee9c724101010100140000240000000057616c6c657420312073686172652b9cd6f4} B>boc PUSHREF
+""";
+
+;; Cell J50Ul30mdpcOic5ob+7SMMyMjhBsarOZztJCDl/d5kc=
+cell __gen_cell_cell_279d14977d2676970e89ce686feed230cc8c8e106c6ab399ced2420e5fdde647() asm """
+    B{b5ee9c724101010100140000240000000057616c6c6574203220736861726573e9d34c} B>boc PUSHREF
+""";
+
+;; Cell 1Fms2pU8af7FwVJ3ViYt+j2zF3E3EBbTaKJKwTbeW+c=
+cell __gen_cell_cell_d459acda953c69fec5c1527756262dfa3db31771371016d368a24ac136de5be7() asm """
+    B{b5ee9c72410101010032000060000000004f727068616e65642075706c696e652072657761726420666f72206175746f20646973747269627574696f6ea8e3e564} B>boc PUSHREF
+""";
+
+;; Cell sdVKHFPDPwwqc2JVaCsSvw+M2oQOIzODEkSHSw/fBNs=
+cell __gen_cell_cell_b1d54a1c53c33f0c2a736255682b12bf0f8cda840e2333831244874b0fdf04db() asm """
+    B{b5ee9c7241010101003500006600000000556e7175616c69666965642075706c696e652072657761726420666f72206175746f20646973747269627574696f6ecb5efdde} B>boc PUSHREF
+""";
+
+;; Cell Ad7VDNMluSJvFmORlO3UNhKSMVduAS72POIOatr4w90=
+cell __gen_cell_cell_01ded50cd325b9226f16639194edd436129231576e012ef63ce20e6adaf8c3dd() asm """
+    B{b5ee9c7241010101002900004e0000000055706c696e652072657761726420666f72206175746f20646973747269627574696f6ebdfe6dfc} B>boc PUSHREF
+""";
+
+;; Cell q3mmeE3Pdz55FUl3MnHYWEsrZN7sBpimSyZVCQcHokg=
+cell __gen_cell_cell_ab79a6784dcf773e791549773271d8584b2b64deec0698a64b2655090707a248() asm """
+    B{b5ee9c7241010101002f00005a000000004c6576656c2072656e6577616c20626f6e757320666f72206175746f20646973747269627574696f6e5107cfe3} B>boc PUSHREF
+""";
+
+;; Cell Q0lAD3EJ9/H/xDdnm4qh+lqacC5q+gVdBNtUbdgRkrw=
+cell __gen_cell_cell_4349400f7109f7f1ffc437679b8aa1fa5a9a702e6afa055d04db546dd81192bc() asm """
+    B{b5ee9c7241010101003600006800000000556e7175616c696669656420726566657272657220626f6e757320666f72206175746f20646973747269627574696f6e201bbdaa} B>boc PUSHREF
+""";
+
+;; Cell QyaN73bpZyNbPb1SKcFQ2UgbSu9RAiGq3pmIgHgFSRc=
+cell __gen_cell_cell_43268def76e967235b3dbd5229c150d9481b4aef510221aade99888078054917() asm """
+    B{b5ee9c7241010101001d00003600000000526567697374726174696f6e207375636365737366756cfeaf3eb6} B>boc PUSHREF
+""";
+
+;; Cell p+9+6s1oiz8eaJYP1CQ6Ft/+7y7r0Qv6w3CPSrI4qVA=
+cell __gen_cell_cell_a7ef7eeacd688b3f1e68960fd4243a16dffeef2eebd10bfac3708f4ab238a950() asm """
+    B{b5ee9c7241010101001e000038000000004c6576656c2075706772616465207375636365737366756ca2d6cbbe} B>boc PUSHREF
+""";
+
+;; Cell H1vO2oihiT+VtYqcVDCcb4qDDa/cfGpYpV+snae6llA=
+cell __gen_cell_cell_1f5bceda88a1893f95b58a9c54309c6f8a830dafdc7c6a58a55fac9da7ba9650() asm """
+    B{b5ee9c72410101010024000044000000004c6576656c2065787069726564202d20706c656173652075706772616465f5bfad14} B>boc PUSHREF
+""";
+
+;; Cell pucy7gjdZDhUCG9LbOdE9pecJRTTmlf8vkskuTY6udU=
+cell __gen_cell_cell_a6e732ee08dd643854086f4b6ce744f6979c2514d39a57fcbe4b24b9363ab9d5() asm """
+    B{b5ee9c7241010101003100005e000000004461696c7920636865636b2d696e2072657761726420666f72206175746f20646973747269627574696f6e6421510b} B>boc PUSHREF
+""";
+
+;; Cell GB480BlcXi0Fn1xIBcqgqHNEoJ18Ur6UneLZWIHS5pI=
+cell __gen_cell_cell_181e3cd0195c5e2d059f5c4805caa0a87344a09d7c52be949de2d95881d2e692() asm """
+    B{b5ee9c7241010101001900002e00000000436865636b2d696e207375636365737366756cd5f26c4c} B>boc PUSHREF
+""";
+
+;; Cell OTuSZmFDev8ny3cj5LA84WEAsuZmtd94yELhQ5sfw4U=
+cell __gen_cell_cell_393b926661437aff27cb7723e4b03ce16100b2e666b5df78c842e1439b1fc385() asm """
+    B{b5ee9c7241010101003300006200000000436c61696d65642070656e64696e67207265776172647320666f72206175746f20646973747269627574696f6e15a9c690} B>boc PUSHREF
+""";
+
+;; Cell 9/RFp0t0+ql1vuQzpKSCRB+PL60btXea0bBjiRz5mbQ=
+cell __gen_cell_cell_f7f445a74b74faa975bee433a4a482441f8f2fad1bb5779ad1b063891cf999b4() asm """
+    B{b5ee9c7241010101001800002c000000005374616b696e67207375636365737366756cc20fef16} B>boc PUSHREF
+""";
+
+;; Cell CSsFeDSUkEF31h9yGo+an2H1bq9gVXRI5FoKBC3qjAc=
+cell __gen_cell_cell_092b05783494904177d61f721a8f9a9f61f56eaf60557448e45a0a042dea8c07() asm """
+    B{b5ee9c7241010101002b000052000000005374616b696e67207265776172647320666f72206175746f20646973747269627574696f6e07066909} B>boc PUSHREF
+""";
+
+;; Cell Vm3TrIwrhlfYnOEJoPYx5jwDDnAC5H4DdqOZ52ouJBI=
+cell __gen_cell_cell_566dd3ac8c2b8657d89ce109a0f631e63c030e7002e47e0376a399e76a2e2412() asm """
+    B{b5ee9c7241010101002c00005400000000556e7374616b696e672072657475726e20666f72206175746f20646973747269627574696f6ebbd10771} B>boc PUSHREF
+""";
+
+;; Cell Qfv9Tx1os55LuwlKVsN5qxzOi5UBE1jVw+s4x8N293E=
+cell __gen_cell_cell_41fbfd4f1d68b39e4bbb094a56c379ab1cce8b95011358d5c3eb38c7c376f771() asm """
+    B{b5ee9c7241010101001a00003000000000456d657267656e6379207769746864726177616cda2a81e5} B>boc PUSHREF
+""";
+
+;; String ", Distributed: "
+slice __gen_slice_string_64e30ccc378156915a128e17ae2d042eb37e4303f9c83c4054ac964e562ce4f5() asm """
+    B{b5ee9c7241010101001100001e2c2044697374726962757465643a20a93c6493} B>boc <s PUSHSLICE
+""";
+
+;; String ", Staked: "
+slice __gen_slice_string_df7558679b4b92821acaa8e4403cdcb27b03597886c1f510c4c2e90dcee0ff10() asm """
+    B{b5ee9c7241010101000c0000142c205374616b65643a2070a9c5a1} B>boc <s PUSHSLICE
+""";
+
+;; String "Users: "
+slice __gen_slice_string_dd1d7c1de7251b5e9b43b786451168ee135d93bb0d518ce00b26206ecb2c5fe6() asm """
+    B{b5ee9c7241010101000900000e55736572733a20fc7b43c2} B>boc <s PUSHSLICE
+""";
+
+;; ton_crown.tact_TonCrown.storage.fc
+;;
+;; Type: Context
+;; TLB: _ bounceable:bool sender:address value:int257 raw:^slice = Context
+;;
+
+_ $Context$_get_value((int, slice, int, slice) v) inline {
+    var (v'bounceable, v'sender, v'value, v'raw) = v;
+    return v'value;
+}
+
+;;
+;; Type: SendParameters
+;; TLB: _ mode:int257 body:Maybe ^cell code:Maybe ^cell data:Maybe ^cell value:int257 to:address bounce:bool = SendParameters
+;;
+
+((int, cell, cell, cell, int, slice, int)) $SendParameters$_constructor_to_value_mode_body(slice $to, int $value, int $mode, cell $body) inline {
+    return ($mode, $body, null(), null(), $value, $to, true);
+}
+
+;;
+;; Type: MessageParameters
+;; TLB: _ mode:int257 body:Maybe ^cell value:int257 to:address bounce:bool = MessageParameters
+;;
+
+((int, cell, int, slice, int)) $MessageParameters$_constructor_bounce_to_value_mode_body(int $bounce, slice $to, int $value, int $mode, cell $body) inline {
+    return ($mode, $body, $value, $to, $bounce);
+}
+
+;;
+;; Type: Deploy
+;; Header: 0x946a98b6
+;; TLB: deploy#946a98b6 queryId:uint64 = Deploy
+;;
+
+(slice, ((int))) $Deploy$_load_without_opcode(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    return (sc_0, (v'queryId));
+}
+
+;;
+;; Type: DeployOk
+;; Header: 0xaff90f57
+;; TLB: deploy_ok#aff90f57 queryId:uint64 = DeployOk
+;;
+
+builder $DeployOk$_store(builder build_0, (int) v) inline {
+    var (v'queryId) = v;
+    build_0 = store_uint(build_0, 2952335191, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    return build_0;
+}
+
+cell $DeployOk$_store_cell((int) v) inline {
+    return $DeployOk$_store(begin_cell(), v).end_cell();
+}
+
+((int)) $DeployOk$_constructor_queryId(int $queryId) inline {
+    return ($queryId);
+}
+
+;;
+;; Type: ChangeOwner
+;; Header: 0x819dbe99
+;; TLB: change_owner#819dbe99 queryId:uint64 newOwner:address = ChangeOwner
+;;
+
+(slice, ((int, slice))) $ChangeOwner$_load_without_opcode(slice sc_0) inline {
+    var v'queryId = sc_0~load_uint(64);
+    var v'newOwner = sc_0~load_msg_addr();
+    return (sc_0, (v'queryId, v'newOwner));
+}
+
+;;
+;; Type: ChangeOwnerOk
+;; Header: 0x327b2b4a
+;; TLB: change_owner_ok#327b2b4a queryId:uint64 newOwner:address = ChangeOwnerOk
+;;
+
+builder $ChangeOwnerOk$_store(builder build_0, (int, slice) v) inline {
+    var (v'queryId, v'newOwner) = v;
+    build_0 = store_uint(build_0, 846932810, 32);
+    build_0 = build_0.store_uint(v'queryId, 64);
+    build_0 = build_0.store_slice(v'newOwner);
+    return build_0;
+}
+
+cell $ChangeOwnerOk$_store_cell((int, slice) v) inline {
+    return $ChangeOwnerOk$_store(begin_cell(), v).end_cell();
+}
+
+((int, slice)) $ChangeOwnerOk$_constructor_queryId_newOwner(int $queryId, slice $newOwner) inline {
+    return ($queryId, $newOwner);
+}
+
+;;
+;; Type: User
+;; TLB: _ address:address referrer:address level:uint8 vipClass:uint8 directReferrals:uint16 totalReferrals:uint32 lastCheckIn:uint32 levelExpiration:uint32 totalEarned:coins pendingRewards:coins isActive:bool registrationTime:uint32 = User
+;;
+
+builder $User$_store(builder build_0, (slice, slice, int, int, int, int, int, int, int, int, int, int) v) inline_ref {
+    var (v'address, v'referrer, v'level, v'vipClass, v'directReferrals, v'totalReferrals, v'lastCheckIn, v'levelExpiration, v'totalEarned, v'pendingRewards, v'isActive, v'registrationTime) = v;
+    build_0 = build_0.store_slice(v'address);
+    build_0 = __tact_store_address_opt(build_0, v'referrer);
+    build_0 = build_0.store_uint(v'level, 8);
+    build_0 = build_0.store_uint(v'vipClass, 8);
+    build_0 = build_0.store_uint(v'directReferrals, 16);
+    build_0 = build_0.store_uint(v'totalReferrals, 32);
+    build_0 = build_0.store_uint(v'lastCheckIn, 32);
+    build_0 = build_0.store_uint(v'levelExpiration, 32);
+    build_0 = build_0.store_varuint16(v'totalEarned);
+    build_0 = build_0.store_varuint16(v'pendingRewards);
+    build_0 = build_0.store_int(v'isActive, 1);
+    build_0 = build_0.store_uint(v'registrationTime, 32);
+    return build_0;
+}
+
+cell $User$_store_cell((slice, slice, int, int, int, int, int, int, int, int, int, int) v) inline {
+    return $User$_store(begin_cell(), v).end_cell();
+}
+
+(slice, ((slice, slice, int, int, int, int, int, int, int, int, int, int))) $User$_load(slice sc_0) inline_ref {
+    var v'address = sc_0~load_msg_addr();
+    var v'referrer = sc_0~__tact_load_address_opt();
+    var v'level = sc_0~load_uint(8);
+    var v'vipClass = sc_0~load_uint(8);
+    var v'directReferrals = sc_0~load_uint(16);
+    var v'totalReferrals = sc_0~load_uint(32);
+    var v'lastCheckIn = sc_0~load_uint(32);
+    var v'levelExpiration = sc_0~load_uint(32);
+    var v'totalEarned = sc_0~load_varuint16();
+    var v'pendingRewards = sc_0~load_varuint16();
+    var v'isActive = sc_0~load_int(1);
+    var v'registrationTime = sc_0~load_uint(32);
+    return (sc_0, (v'address, v'referrer, v'level, v'vipClass, v'directReferrals, v'totalReferrals, v'lastCheckIn, v'levelExpiration, v'totalEarned, v'pendingRewards, v'isActive, v'registrationTime));
+}
+
+tuple $User$_as_optional((slice, slice, int, int, int, int, int, int, int, int, int, int) v) inline {
+    var (v'address, v'referrer, v'level, v'vipClass, v'directReferrals, v'totalReferrals, v'lastCheckIn, v'levelExpiration, v'totalEarned, v'pendingRewards, v'isActive, v'registrationTime) = v;
+    return __tact_tuple_create_12(v'address, v'referrer, v'level, v'vipClass, v'directReferrals, v'totalReferrals, v'lastCheckIn, v'levelExpiration, v'totalEarned, v'pendingRewards, v'isActive, v'registrationTime);
+}
+
+tuple $User$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $User$_as_optional(sc~$User$_load());
+}
+
+_ $User$_get_isActive((slice, slice, int, int, int, int, int, int, int, int, int, int) v) inline {
+    var (v'address, v'referrer, v'level, v'vipClass, v'directReferrals, v'totalReferrals, v'lastCheckIn, v'levelExpiration, v'totalEarned, v'pendingRewards, v'isActive, v'registrationTime) = v;
+    return v'isActive;
+}
+
+((slice, slice, int, int, int, int, int, int, int, int, int, int)) $User$_not_null(tuple v) inline {
+    throw_if(128, null?(v));
+    var (slice vvv'address, slice vvv'referrer, int vvv'level, int vvv'vipClass, int vvv'directReferrals, int vvv'totalReferrals, int vvv'lastCheckIn, int vvv'levelExpiration, int vvv'totalEarned, int vvv'pendingRewards, int vvv'isActive, int vvv'registrationTime) = __tact_tuple_destroy_12(v);
+    return (vvv'address, vvv'referrer, vvv'level, vvv'vipClass, vvv'directReferrals, vvv'totalReferrals, vvv'lastCheckIn, vvv'levelExpiration, vvv'totalEarned, vvv'pendingRewards, vvv'isActive, vvv'registrationTime);
+}
+
+tuple $User$_to_tuple(((slice, slice, int, int, int, int, int, int, int, int, int, int)) v) inline {
+    var (v'address, v'referrer, v'level, v'vipClass, v'directReferrals, v'totalReferrals, v'lastCheckIn, v'levelExpiration, v'totalEarned, v'pendingRewards, v'isActive, v'registrationTime) = v;
+    return __tact_tuple_create_12(v'address, v'referrer, v'level, v'vipClass, v'directReferrals, v'totalReferrals, v'lastCheckIn, v'levelExpiration, v'totalEarned, v'pendingRewards, v'isActive, v'registrationTime);
+}
+
+tuple $User$_to_opt_tuple(tuple v) inline {
+    if (null?(v)) { return null(); } 
+    return $User$_to_tuple($User$_not_null(v)); 
+}
+
+tuple $User$_to_opt_external(tuple v) inline {
+    var loaded = $User$_to_opt_tuple(v);
+    if (null?(loaded)) {
+        return null();
+    } else {
+        return (loaded);
+    }
+}
+
+((slice, slice, int, int, int, int, int, int, int, int, int, int)) $User$_constructor_address_referrer_level_vipClass_directReferrals_totalReferrals_lastCheckIn_levelExpiration_totalEarned_pendingRewards_isActive_registrationTime(slice $address, slice $referrer, int $level, int $vipClass, int $directReferrals, int $totalReferrals, int $lastCheckIn, int $levelExpiration, int $totalEarned, int $pendingRewards, int $isActive, int $registrationTime) inline {
+    return ($address, $referrer, $level, $vipClass, $directReferrals, $totalReferrals, $lastCheckIn, $levelExpiration, $totalEarned, $pendingRewards, $isActive, $registrationTime);
+}
+
+;;
+;; Type: StakeInfo
+;; TLB: _ amount:coins startTime:uint32 duration:uint32 vipClass:uint8 autoRestake:bool lastClaim:uint32 totalClaimed:coins isActive:bool = StakeInfo
+;;
+
+builder $StakeInfo$_store(builder build_0, (int, int, int, int, int, int, int, int) v) inline {
+    var (v'amount, v'startTime, v'duration, v'vipClass, v'autoRestake, v'lastClaim, v'totalClaimed, v'isActive) = v;
+    build_0 = build_0.store_varuint16(v'amount);
+    build_0 = build_0.store_uint(v'startTime, 32);
+    build_0 = build_0.store_uint(v'duration, 32);
+    build_0 = build_0.store_uint(v'vipClass, 8);
+    build_0 = build_0.store_int(v'autoRestake, 1);
+    build_0 = build_0.store_uint(v'lastClaim, 32);
+    build_0 = build_0.store_varuint16(v'totalClaimed);
+    build_0 = build_0.store_int(v'isActive, 1);
+    return build_0;
+}
+
+cell $StakeInfo$_store_cell((int, int, int, int, int, int, int, int) v) inline {
+    return $StakeInfo$_store(begin_cell(), v).end_cell();
+}
+
+(slice, ((int, int, int, int, int, int, int, int))) $StakeInfo$_load(slice sc_0) inline {
+    var v'amount = sc_0~load_varuint16();
+    var v'startTime = sc_0~load_uint(32);
+    var v'duration = sc_0~load_uint(32);
+    var v'vipClass = sc_0~load_uint(8);
+    var v'autoRestake = sc_0~load_int(1);
+    var v'lastClaim = sc_0~load_uint(32);
+    var v'totalClaimed = sc_0~load_varuint16();
+    var v'isActive = sc_0~load_int(1);
+    return (sc_0, (v'amount, v'startTime, v'duration, v'vipClass, v'autoRestake, v'lastClaim, v'totalClaimed, v'isActive));
+}
+
+tuple $StakeInfo$_as_optional((int, int, int, int, int, int, int, int) v) inline {
+    var (v'amount, v'startTime, v'duration, v'vipClass, v'autoRestake, v'lastClaim, v'totalClaimed, v'isActive) = v;
+    return __tact_tuple_create_8(v'amount, v'startTime, v'duration, v'vipClass, v'autoRestake, v'lastClaim, v'totalClaimed, v'isActive);
+}
+
+tuple $StakeInfo$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $StakeInfo$_as_optional(sc~$StakeInfo$_load());
+}
+
+_ $StakeInfo$_get_isActive((int, int, int, int, int, int, int, int) v) inline {
+    var (v'amount, v'startTime, v'duration, v'vipClass, v'autoRestake, v'lastClaim, v'totalClaimed, v'isActive) = v;
+    return v'isActive;
+}
+
+((int, int, int, int, int, int, int, int)) $StakeInfo$_not_null(tuple v) inline {
+    throw_if(128, null?(v));
+    var (int vvv'amount, int vvv'startTime, int vvv'duration, int vvv'vipClass, int vvv'autoRestake, int vvv'lastClaim, int vvv'totalClaimed, int vvv'isActive) = __tact_tuple_destroy_8(v);
+    return (vvv'amount, vvv'startTime, vvv'duration, vvv'vipClass, vvv'autoRestake, vvv'lastClaim, vvv'totalClaimed, vvv'isActive);
+}
+
+tuple $StakeInfo$_to_tuple(((int, int, int, int, int, int, int, int)) v) inline {
+    var (v'amount, v'startTime, v'duration, v'vipClass, v'autoRestake, v'lastClaim, v'totalClaimed, v'isActive) = v;
+    return __tact_tuple_create_8(v'amount, v'startTime, v'duration, v'vipClass, v'autoRestake, v'lastClaim, v'totalClaimed, v'isActive);
+}
+
+tuple $StakeInfo$_to_opt_tuple(tuple v) inline {
+    if (null?(v)) { return null(); } 
+    return $StakeInfo$_to_tuple($StakeInfo$_not_null(v)); 
+}
+
+tuple $StakeInfo$_to_opt_external(tuple v) inline {
+    var loaded = $StakeInfo$_to_opt_tuple(v);
+    if (null?(loaded)) {
+        return null();
+    } else {
+        return (loaded);
+    }
+}
+
+((int, int, int, int, int, int, int, int)) $StakeInfo$_constructor_amount_startTime_duration_vipClass_autoRestake_lastClaim_totalClaimed_isActive(int $amount, int $startTime, int $duration, int $vipClass, int $autoRestake, int $lastClaim, int $totalClaimed, int $isActive) inline {
+    return ($amount, $startTime, $duration, $vipClass, $autoRestake, $lastClaim, $totalClaimed, $isActive);
+}
+
+;;
+;; Type: VipConfig
+;; TLB: _ dailyRoi:uint16 minLevel:uint8 maxLevel:uint8 stakingRoi:uint16 = VipConfig
+;;
+
+builder $VipConfig$_store(builder build_0, (int, int, int, int) v) inline {
+    var (v'dailyRoi, v'minLevel, v'maxLevel, v'stakingRoi) = v;
+    build_0 = build_0.store_uint(v'dailyRoi, 16);
+    build_0 = build_0.store_uint(v'minLevel, 8);
+    build_0 = build_0.store_uint(v'maxLevel, 8);
+    build_0 = build_0.store_uint(v'stakingRoi, 16);
+    return build_0;
+}
+
+cell $VipConfig$_store_cell((int, int, int, int) v) inline {
+    return $VipConfig$_store(begin_cell(), v).end_cell();
+}
+
+(slice, ((int, int, int, int))) $VipConfig$_load(slice sc_0) inline {
+    var v'dailyRoi = sc_0~load_uint(16);
+    var v'minLevel = sc_0~load_uint(8);
+    var v'maxLevel = sc_0~load_uint(8);
+    var v'stakingRoi = sc_0~load_uint(16);
+    return (sc_0, (v'dailyRoi, v'minLevel, v'maxLevel, v'stakingRoi));
+}
+
+tuple $VipConfig$_as_optional((int, int, int, int) v) inline {
+    var (v'dailyRoi, v'minLevel, v'maxLevel, v'stakingRoi) = v;
+    return __tact_tuple_create_4(v'dailyRoi, v'minLevel, v'maxLevel, v'stakingRoi);
+}
+
+tuple $VipConfig$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $VipConfig$_as_optional(sc~$VipConfig$_load());
+}
+
+_ $VipConfig$_get_stakingRoi((int, int, int, int) v) inline {
+    var (v'dailyRoi, v'minLevel, v'maxLevel, v'stakingRoi) = v;
+    return v'stakingRoi;
+}
+
+((int, int, int, int)) $VipConfig$_not_null(tuple v) inline {
+    throw_if(128, null?(v));
+    var (int vvv'dailyRoi, int vvv'minLevel, int vvv'maxLevel, int vvv'stakingRoi) = __tact_tuple_destroy_4(v);
+    return (vvv'dailyRoi, vvv'minLevel, vvv'maxLevel, vvv'stakingRoi);
+}
+
+tuple $VipConfig$_to_tuple(((int, int, int, int)) v) inline {
+    var (v'dailyRoi, v'minLevel, v'maxLevel, v'stakingRoi) = v;
+    return __tact_tuple_create_4(v'dailyRoi, v'minLevel, v'maxLevel, v'stakingRoi);
+}
+
+tuple $VipConfig$_to_opt_tuple(tuple v) inline {
+    if (null?(v)) { return null(); } 
+    return $VipConfig$_to_tuple($VipConfig$_not_null(v)); 
+}
+
+tuple $VipConfig$_to_opt_external(tuple v) inline {
+    var loaded = $VipConfig$_to_opt_tuple(v);
+    if (null?(loaded)) {
+        return null();
+    } else {
+        return (loaded);
+    }
+}
+
+((int, int, int, int)) $VipConfig$_constructor_dailyRoi_minLevel_maxLevel_stakingRoi(int $dailyRoi, int $minLevel, int $maxLevel, int $stakingRoi) inline {
+    return ($dailyRoi, $minLevel, $maxLevel, $stakingRoi);
+}
+
+;;
+;; Type: ReferralNode
+;; TLB: _ referrer:address referralIndex:uint8 depth:uint8 = ReferralNode
+;;
+
+builder $ReferralNode$_store(builder build_0, (slice, int, int) v) inline {
+    var (v'referrer, v'referralIndex, v'depth) = v;
+    build_0 = build_0.store_slice(v'referrer);
+    build_0 = build_0.store_uint(v'referralIndex, 8);
+    build_0 = build_0.store_uint(v'depth, 8);
+    return build_0;
+}
+
+cell $ReferralNode$_store_cell((slice, int, int) v) inline {
+    return $ReferralNode$_store(begin_cell(), v).end_cell();
+}
+
+(slice, ((slice, int, int))) $ReferralNode$_load(slice sc_0) inline {
+    var v'referrer = sc_0~load_msg_addr();
+    var v'referralIndex = sc_0~load_uint(8);
+    var v'depth = sc_0~load_uint(8);
+    return (sc_0, (v'referrer, v'referralIndex, v'depth));
+}
+
+tuple $ReferralNode$_as_optional((slice, int, int) v) inline {
+    var (v'referrer, v'referralIndex, v'depth) = v;
+    return __tact_tuple_create_3(v'referrer, v'referralIndex, v'depth);
+}
+
+tuple $ReferralNode$_load_opt(cell cl) inline {
+    if (null?(cl)) {
+        return null();
+    }
+    var sc = cl.begin_parse();
+    return $ReferralNode$_as_optional(sc~$ReferralNode$_load());
+}
+
+((slice, int, int)) $ReferralNode$_not_null(tuple v) inline {
+    throw_if(128, null?(v));
+    var (slice vvv'referrer, int vvv'referralIndex, int vvv'depth) = __tact_tuple_destroy_3(v);
+    return (vvv'referrer, vvv'referralIndex, vvv'depth);
+}
+
+tuple $ReferralNode$_to_tuple(((slice, int, int)) v) inline {
+    var (v'referrer, v'referralIndex, v'depth) = v;
+    return __tact_tuple_create_3(v'referrer, v'referralIndex, v'depth);
+}
+
+tuple $ReferralNode$_to_opt_tuple(tuple v) inline {
+    if (null?(v)) { return null(); } 
+    return $ReferralNode$_to_tuple($ReferralNode$_not_null(v)); 
+}
+
+tuple $ReferralNode$_to_opt_external(tuple v) inline {
+    var loaded = $ReferralNode$_to_opt_tuple(v);
+    if (null?(loaded)) {
+        return null();
+    } else {
+        return (loaded);
+    }
+}
+
+((slice, int, int)) $ReferralNode$_constructor_referrer_referralIndex_depth(slice $referrer, int $referralIndex, int $depth) inline {
+    return ($referrer, $referralIndex, $depth);
+}
+
+;;
+;; Type: PlatformStats
+;; TLB: _ totalUsers:uint32 totalStaked:coins totalDistributed:coins activeStakes:uint32 = PlatformStats
+;;
+
+(int, int, int, int) $PlatformStats$_to_external(((int, int, int, int)) v) inline {
+    var (v'totalUsers, v'totalStaked, v'totalDistributed, v'activeStakes) = v; 
+    return (v'totalUsers, v'totalStaked, v'totalDistributed, v'activeStakes);
+}
+
+((int, int, int, int)) $PlatformStats$_constructor_totalUsers_totalStaked_totalDistributed_activeStakes(int $totalUsers, int $totalStaked, int $totalDistributed, int $activeStakes) inline {
+    return ($totalUsers, $totalStaked, $totalDistributed, $activeStakes);
+}
+
+;;
+;; Type: Register
+;; Header: 0xf76b6fae
+;; TLB: register#f76b6fae referrerAddress:address = Register
+;;
+
+(slice, ((slice))) $Register$_load_without_opcode(slice sc_0) inline {
+    var v'referrerAddress = sc_0~__tact_load_address_opt();
+    return (sc_0, (v'referrerAddress));
+}
+
+;;
+;; Type: UpgradeLevel
+;; Header: 0x3ab103cb
+;; TLB: upgrade_level#3ab103cb targetLevel:uint8 = UpgradeLevel
+;;
+
+(slice, ((int))) $UpgradeLevel$_load_without_opcode(slice sc_0) inline {
+    var v'targetLevel = sc_0~load_uint(8);
+    return (sc_0, (v'targetLevel));
+}
+
+;;
+;; Type: CheckIn
+;; Header: 0x37517518
+;; TLB: check_in#37517518  = CheckIn
+;;
+
+(slice, (tuple)) $CheckIn$_load_without_opcode(slice sc_0) inline {
+    return (sc_0, null());
+}
+
+;;
+;; Type: StakeTON
+;; Header: 0xfc4f07ec
+;; TLB: stake_ton#fc4f07ec duration:uint32 autoRestake:bool = StakeTON
+;;
+
+(slice, ((int, int))) $StakeTON$_load_without_opcode(slice sc_0) inline {
+    var v'duration = sc_0~load_uint(32);
+    var v'autoRestake = sc_0~load_int(1);
+    return (sc_0, (v'duration, v'autoRestake));
+}
+
+;;
+;; Type: ClaimStakingRewards
+;; Header: 0xcb471282
+;; TLB: claim_staking_rewards#cb471282  = ClaimStakingRewards
+;;
+
+(slice, (tuple)) $ClaimStakingRewards$_load_without_opcode(slice sc_0) inline {
+    return (sc_0, null());
+}
+
+;;
+;; Type: UnstakeTON
+;; Header: 0xa0732b3c
+;; TLB: unstake_ton#a0732b3c  = UnstakeTON
+;;
+
+(slice, (tuple)) $UnstakeTON$_load_without_opcode(slice sc_0) inline {
+    return (sc_0, null());
+}
+
+;;
+;; Type: ClaimPendingRewards
+;; Header: 0xe6304cbb
+;; TLB: claim_pending_rewards#e6304cbb  = ClaimPendingRewards
+;;
+
+(slice, (tuple)) $ClaimPendingRewards$_load_without_opcode(slice sc_0) inline {
+    return (sc_0, null());
+}
+
+;;
+;; Type: SetCreatorWallet
+;; Header: 0x1b182499
+;; TLB: set_creator_wallet#1b182499 walletId:uint8 address:address = SetCreatorWallet
+;;
+
+(slice, ((int, slice))) $SetCreatorWallet$_load_without_opcode(slice sc_0) inline {
+    var v'walletId = sc_0~load_uint(8);
+    var v'address = sc_0~load_msg_addr();
+    return (sc_0, (v'walletId, v'address));
+}
+
+;;
+;; Type: UpdateVipConfig
+;; Header: 0x06b6967e
+;; TLB: update_vip_config#06b6967e vipClass:uint8 config:VipConfig{dailyRoi:uint16,minLevel:uint8,maxLevel:uint8,stakingRoi:uint16} = UpdateVipConfig
+;;
+
+(slice, ((int, (int, int, int, int)))) $UpdateVipConfig$_load_without_opcode(slice sc_0) inline {
+    var v'vipClass = sc_0~load_uint(8);
+    var v'config = sc_0~$VipConfig$_load();
+    return (sc_0, (v'vipClass, v'config));
+}
+
+;;
+;; Type: UpdateLevelCost
+;; Header: 0xe3b5e901
+;; TLB: update_level_cost#e3b5e901 level:uint8 cost:coins = UpdateLevelCost
+;;
+
+(slice, ((int, int))) $UpdateLevelCost$_load_without_opcode(slice sc_0) inline {
+    var v'level = sc_0~load_uint(8);
+    var v'cost = sc_0~load_varuint16();
+    return (sc_0, (v'level, v'cost));
+}
+
+;;
+;; Type: EmergencyPause
+;; Header: 0x3f7082c1
+;; TLB: emergency_pause#3f7082c1 paused:bool = EmergencyPause
+;;
+
+(slice, ((int))) $EmergencyPause$_load_without_opcode(slice sc_0) inline {
+    var v'paused = sc_0~load_int(1);
+    return (sc_0, (v'paused));
+}
+
+;;
+;; Type: TonCrown
+;; TLB: _ owner:address creatorWallet1:address creatorWallet2:address creatorWallet3:address creatorWallet4:address users:dict<address, ^User{address:address,referrer:address,level:uint8,vipClass:uint8,directReferrals:uint16,totalReferrals:uint32,lastCheckIn:uint32,levelExpiration:uint32,totalEarned:coins,pendingRewards:coins,isActive:bool,registrationTime:uint32}> stakes:dict<address, ^StakeInfo{amount:coins,startTime:uint32,duration:uint32,vipClass:uint8,autoRestake:bool,lastClaim:uint32,totalClaimed:coins,isActive:bool}> referralNodes:dict<address, ^ReferralNode{referrer:address,referralIndex:uint8,depth:uint8}> levelCosts:dict<int, int> vipConfigs:dict<int, ^VipConfig{dailyRoi:uint16,minLevel:uint8,maxLevel:uint8,stakingRoi:uint16}> totalUsers:uint32 totalStaked:coins totalDistributed:coins activeStakes:uint32 isPaused:bool = TonCrown
+;;
+
+builder $TonCrown$_store(builder build_0, (slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) v) inline {
+    var (v'owner, v'creatorWallet1, v'creatorWallet2, v'creatorWallet3, v'creatorWallet4, v'users, v'stakes, v'referralNodes, v'levelCosts, v'vipConfigs, v'totalUsers, v'totalStaked, v'totalDistributed, v'activeStakes, v'isPaused) = v;
+    build_0 = build_0.store_slice(v'owner);
+    build_0 = build_0.store_slice(v'creatorWallet1);
+    build_0 = build_0.store_slice(v'creatorWallet2);
+    var build_1 = begin_cell();
+    build_1 = build_1.store_slice(v'creatorWallet3);
+    build_1 = build_1.store_slice(v'creatorWallet4);
+    build_1 = build_1.store_dict(v'users);
+    build_1 = build_1.store_dict(v'stakes);
+    build_1 = build_1.store_dict(v'referralNodes);
+    var build_2 = begin_cell();
+    build_2 = build_2.store_dict(v'levelCosts);
+    build_2 = build_2.store_dict(v'vipConfigs);
+    build_2 = build_2.store_uint(v'totalUsers, 32);
+    build_2 = build_2.store_varuint16(v'totalStaked);
+    build_2 = build_2.store_varuint16(v'totalDistributed);
+    build_2 = build_2.store_uint(v'activeStakes, 32);
+    build_2 = build_2.store_int(v'isPaused, 1);
+    build_1 = store_builder_ref(build_1, build_2);
+    build_0 = store_builder_ref(build_0, build_1);
+    return build_0;
+}
+
+(slice, ((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int))) $TonCrown$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    var v'creatorWallet1 = sc_0~load_msg_addr();
+    var v'creatorWallet2 = sc_0~load_msg_addr();
+    slice sc_1 = sc_0~load_ref().begin_parse();
+    var v'creatorWallet3 = sc_1~load_msg_addr();
+    var v'creatorWallet4 = sc_1~load_msg_addr();
+    var v'users = sc_1~load_dict();
+    var v'stakes = sc_1~load_dict();
+    var v'referralNodes = sc_1~load_dict();
+    slice sc_2 = sc_1~load_ref().begin_parse();
+    var v'levelCosts = sc_2~load_dict();
+    var v'vipConfigs = sc_2~load_dict();
+    var v'totalUsers = sc_2~load_uint(32);
+    var v'totalStaked = sc_2~load_varuint16();
+    var v'totalDistributed = sc_2~load_varuint16();
+    var v'activeStakes = sc_2~load_uint(32);
+    var v'isPaused = sc_2~load_int(1);
+    return (sc_0, (v'owner, v'creatorWallet1, v'creatorWallet2, v'creatorWallet3, v'creatorWallet4, v'users, v'stakes, v'referralNodes, v'levelCosts, v'vipConfigs, v'totalUsers, v'totalStaked, v'totalDistributed, v'activeStakes, v'isPaused));
+}
+
+(slice, ((slice))) $TonCrown$init$_load(slice sc_0) inline {
+    var v'owner = sc_0~load_msg_addr();
+    return (sc_0, (v'owner));
+}
+
+(slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $TonCrown$_contract_load() impure inline {
+    slice $sc = get_data().begin_parse();
+    int $loaded = $sc~load_int(1);
+    if ($loaded) {
+        return $sc~$TonCrown$_load();
+    }
+    else {
+        (slice $owner) = $sc~$TonCrown$init$_load();
+        $sc.end_parse();
+        return $TonCrown$_contract_init($owner);
+    }
+}
+
+() $TonCrown$_contract_store((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) v) impure inline {
+    builder b = begin_cell();
+    b = b.store_int(true, 1);
+    b = $TonCrown$_store(b, v);
+    set_data(b.end_cell());
+}
+
+;;
+;; Contract TonCrown functions
+;;
+
+(slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $TonCrown$_contract_init(slice $owner) impure inline {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = (null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null(), null());
+    $self'owner = $owner;
+    $self'creatorWallet1 = __gen_slice_address_785a41f82b0ad3c3299817c6da3cea540d9c43c1db5abfabf74a3a746af8c9ae();
+    $self'creatorWallet2 = __gen_slice_address_a6975a9ddb0d3779bd0f354bff10f854b7879cb75ad0d73235c97e63dc1e6e41();
+    $self'creatorWallet3 = __gen_slice_address_29eb769c2f7c932291649aa4dd5e7157445e31d2b3411136b0165229212e423c();
+    $self'creatorWallet4 = __gen_slice_address_fac1ea208cd5482e97a4ffac20a2d5affc032fb746ffaba05c37976ef7d030d1();
+    $self'totalUsers = 0;
+    $self'totalStaked = 0;
+    $self'totalDistributed = 0;
+    $self'activeStakes = 0;
+    $self'isPaused = false;
+    $self'levelCosts~__tact_dict_set_int_int(257, 1, 50000000, 257);
+    $self'levelCosts~__tact_dict_set_int_int(257, 2, 100000000, 257);
+    $self'levelCosts~__tact_dict_set_int_int(257, 3, 200000000, 257);
+    $self'levelCosts~__tact_dict_set_int_int(257, 4, 500000000, 257);
+    $self'levelCosts~__tact_dict_set_int_int(257, 5, 1000000000, 257);
+    $self'levelCosts~__tact_dict_set_int_int(257, 6, 2000000000, 257);
+    $self'levelCosts~__tact_dict_set_int_int(257, 7, 5000000000, 257);
+    $self'levelCosts~__tact_dict_set_int_int(257, 8, 10000000000, 257);
+    $self'levelCosts~__tact_dict_set_int_int(257, 9, 20000000000, 257);
+    $self'levelCosts~__tact_dict_set_int_int(257, 10, 50000000000, 257);
+    $self'vipConfigs~__tact_dict_set_int_cell(257, 1, $VipConfig$_store_cell($VipConfig$_constructor_dailyRoi_minLevel_maxLevel_stakingRoi(100, 4, 6, 50)));
+    $self'vipConfigs~__tact_dict_set_int_cell(257, 2, $VipConfig$_store_cell($VipConfig$_constructor_dailyRoi_minLevel_maxLevel_stakingRoi(150, 7, 8, 100)));
+    $self'vipConfigs~__tact_dict_set_int_cell(257, 3, $VipConfig$_store_cell($VipConfig$_constructor_dailyRoi_minLevel_maxLevel_stakingRoi(200, 9, 10, 200)));
+    $self'vipConfigs~__tact_dict_set_int_cell(257, 4, $VipConfig$_store_cell($VipConfig$_constructor_dailyRoi_minLevel_maxLevel_stakingRoi(250, 10, 10, 250)));
+    return ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_requireNotPaused((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    throw_unless(19792, (~ $self'isPaused));
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), (slice, slice, int, int, int, int, int, int, int, int, int, int)) $TonCrown$_fun_requireUserExists((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, slice $user) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    tuple $userData = $User$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $user));
+    throw_unless(57406, (~ null?($userData)));
+    var $fresh$ret_0 = $User$_not_null($userData);
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_0);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_processReferralRegistration((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, slice $newUser, slice $referrer) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    tuple $referrerUser = $User$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $referrer));
+    if (( (null?($referrerUser)) ? (true) : ((~ $User$_get_isActive($User$_not_null($referrerUser)))) )) {
+        var ($user'address, $user'referrer, $user'level, $user'vipClass, $user'directReferrals, $user'totalReferrals, $user'lastCheckIn, $user'levelExpiration, $user'totalEarned, $user'pendingRewards, $user'isActive, $user'registrationTime) = $User$_not_null($User$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $newUser)));
+        $user'referrer = $self'creatorWallet4;
+        $self'users~__tact_dict_set_slice_cell(267, $newUser, $User$_store_cell(($user'address, $user'referrer, $user'level, $user'vipClass, $user'directReferrals, $user'totalReferrals, $user'lastCheckIn, $user'levelExpiration, $user'totalEarned, $user'pendingRewards, $user'isActive, $user'registrationTime)));
+        return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+    }
+    var ($updatedReferrer'address, $updatedReferrer'referrer, $updatedReferrer'level, $updatedReferrer'vipClass, $updatedReferrer'directReferrals, $updatedReferrer'totalReferrals, $updatedReferrer'lastCheckIn, $updatedReferrer'levelExpiration, $updatedReferrer'totalEarned, $updatedReferrer'pendingRewards, $updatedReferrer'isActive, $updatedReferrer'registrationTime) = $User$_not_null($referrerUser);
+    if (($updatedReferrer'directReferrals < 6)) {
+        $updatedReferrer'directReferrals = ($updatedReferrer'directReferrals + 1);
+        $updatedReferrer'totalReferrals = ($updatedReferrer'totalReferrals + 1);
+        var ($referralNode'referrer, $referralNode'referralIndex, $referralNode'depth) = $ReferralNode$_constructor_referrer_referralIndex_depth($referrer, $updatedReferrer'directReferrals, 1);
+        $self'referralNodes~__tact_dict_set_slice_cell(267, $newUser, $ReferralNode$_store_cell(($referralNode'referrer, $referralNode'referralIndex, $referralNode'depth)));
+        $self'users~__tact_dict_set_slice_cell(267, $referrer, $User$_store_cell(($updatedReferrer'address, $updatedReferrer'referrer, $updatedReferrer'level, $updatedReferrer'vipClass, $updatedReferrer'directReferrals, $updatedReferrer'totalReferrals, $updatedReferrer'lastCheckIn, $updatedReferrer'levelExpiration, $updatedReferrer'totalEarned, $updatedReferrer'pendingRewards, $updatedReferrer'isActive, $updatedReferrer'registrationTime)));
+    } else {
+        var ($user'address, $user'referrer, $user'level, $user'vipClass, $user'directReferrals, $user'totalReferrals, $user'lastCheckIn, $user'levelExpiration, $user'totalEarned, $user'pendingRewards, $user'isActive, $user'registrationTime) = $User$_not_null($User$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $newUser)));
+        $user'referrer = $self'creatorWallet4;
+        $self'users~__tact_dict_set_slice_cell(267, $newUser, $User$_store_cell(($user'address, $user'referrer, $user'level, $user'vipClass, $user'directReferrals, $user'totalReferrals, $user'lastCheckIn, $user'levelExpiration, $user'totalEarned, $user'pendingRewards, $user'isActive, $user'registrationTime)));
+    }
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), int) $TonCrown$_fun_calculateVipClass((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $level) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    if (( (($level >= 4)) ? (($level <= 6)) : (false) )) {
+        var $fresh$ret_1 = 1;
+        return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_1);
+    } elseif (( (($level >= 7)) ? (($level <= 8)) : (false) )) {
+        var $fresh$ret_2 = 2;
+        return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_2);
+    } elseif (( (($level >= 9)) ? (($level <= 10)) : (false) )) {
+        var $fresh$ret_3 = 3;
+        return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_3);
+    }
+    var $fresh$ret_4 = 0;
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_4);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_distributeUplineReward((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $amount, slice $upline, int $depth) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    if (( (($depth > 10)) ? (true) : (($amount == 0)) )) {
+        return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+    }
+    tuple $uplineUser = $User$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $upline));
+    if (( (null?($uplineUser)) ? (true) : ((~ $User$_get_isActive($User$_not_null($uplineUser)))) )) {
+        $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet4, $amount, 2, __gen_cell_cell_b1d54a1c53c33f0c2a736255682b12bf0f8cda840e2333831244874b0fdf04db()));
+        return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+    }
+    int $reward = 0;
+    if (($depth <= 6)) {
+        $reward = (($amount * 50) / 100);
+    } else {
+        $reward = (($amount * 25) / 100);
+    }
+    if (($reward > 0)) {
+        $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet4, $reward, 2, __gen_cell_cell_01ded50cd325b9226f16639194edd436129231576e012ef63ce20e6adaf8c3dd()));
+        var ($updatedUpline'address, $updatedUpline'referrer, $updatedUpline'level, $updatedUpline'vipClass, $updatedUpline'directReferrals, $updatedUpline'totalReferrals, $updatedUpline'lastCheckIn, $updatedUpline'levelExpiration, $updatedUpline'totalEarned, $updatedUpline'pendingRewards, $updatedUpline'isActive, $updatedUpline'registrationTime) = $User$_not_null($uplineUser);
+        $updatedUpline'totalEarned = ($updatedUpline'totalEarned + $reward);
+        $self'users~__tact_dict_set_slice_cell(267, $upline, $User$_store_cell(($updatedUpline'address, $updatedUpline'referrer, $updatedUpline'level, $updatedUpline'vipClass, $updatedUpline'directReferrals, $updatedUpline'totalReferrals, $updatedUpline'lastCheckIn, $updatedUpline'levelExpiration, $updatedUpline'totalEarned, $updatedUpline'pendingRewards, $updatedUpline'isActive, $updatedUpline'registrationTime)));
+        if ((~ null?($updatedUpline'referrer))) {
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_distributeUplineReward(($amount - $reward), __tact_not_null($updatedUpline'referrer), ($depth + 1));
+        }
+    }
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_distributeLevelFees((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $amount, slice $payer) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    int $creatorShare = (($amount * 10) / 100);
+    int $wallet1Share = (($amount * 20) / 100);
+    int $wallet2Share = (($amount * 20) / 100);
+    int $uplineShare = (($amount * 30) / 100);
+    $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet3, $creatorShare, 2, __gen_cell_cell_6e2d667312ba80373872348afb28c81a30f775c624514aa631a49d456907ec79()));
+    $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet1, $wallet1Share, 2, __gen_cell_cell_04ca9a125ba8ca7f3676254860f280ac927af7eebf3cd4592bbd9b0159b44eb5()));
+    $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet2, $wallet2Share, 2, __gen_cell_cell_279d14977d2676970e89ce686feed230cc8c8e106c6ab399ced2420e5fdde647()));
+    var ($user'address, $user'referrer, $user'level, $user'vipClass, $user'directReferrals, $user'totalReferrals, $user'lastCheckIn, $user'levelExpiration, $user'totalEarned, $user'pendingRewards, $user'isActive, $user'registrationTime) = $User$_not_null($User$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $payer)));
+    if ((~ null?($user'referrer))) {
+        ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_distributeUplineReward($uplineShare, __tact_not_null($user'referrer), 1);
+    } else {
+        $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet4, $uplineShare, 2, __gen_cell_cell_d459acda953c69fec5c1527756262dfa3db31771371016d368a24ac136de5be7()));
+    }
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), ()) $TonCrown$_fun_distributeLevelRenewalBonus((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $amount, slice $referrer) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    tuple $referrerUser = $User$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $referrer));
+    if (( ((~ null?($referrerUser))) ? ($User$_get_isActive($User$_not_null($referrerUser))) : (false) )) {
+        $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet4, $amount, 2, __gen_cell_cell_ab79a6784dcf773e791549773271d8584b2b64deec0698a64b2655090707a248()));
+        var ($updatedReferrer'address, $updatedReferrer'referrer, $updatedReferrer'level, $updatedReferrer'vipClass, $updatedReferrer'directReferrals, $updatedReferrer'totalReferrals, $updatedReferrer'lastCheckIn, $updatedReferrer'levelExpiration, $updatedReferrer'totalEarned, $updatedReferrer'pendingRewards, $updatedReferrer'isActive, $updatedReferrer'registrationTime) = $User$_not_null($referrerUser);
+        $updatedReferrer'totalEarned = ($updatedReferrer'totalEarned + $amount);
+        $self'users~__tact_dict_set_slice_cell(267, $referrer, $User$_store_cell(($updatedReferrer'address, $updatedReferrer'referrer, $updatedReferrer'level, $updatedReferrer'vipClass, $updatedReferrer'directReferrals, $updatedReferrer'totalReferrals, $updatedReferrer'lastCheckIn, $updatedReferrer'levelExpiration, $updatedReferrer'totalEarned, $updatedReferrer'pendingRewards, $updatedReferrer'isActive, $updatedReferrer'registrationTime)));
+    } else {
+        $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet4, $amount, 2, __gen_cell_cell_4349400f7109f7f1ffc437679b8aa1fa5a9a702e6afa055d04db546dd81192bc()));
+    }
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), ());
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), tuple) $TonCrown$_fun_getUserInfo((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, slice $address) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    var $fresh$ret_5 = $User$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $address));
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_5);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), tuple) $TonCrown$_fun_getStakeInfo((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, slice $address) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    var $fresh$ret_6 = $StakeInfo$_load_opt(__tact_dict_get_slice_cell($self'stakes, 267, $address));
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_6);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), (int, int, int, int)) $TonCrown$_fun_getPlatformStats((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    var $fresh$ret_7 = $PlatformStats$_constructor_totalUsers_totalStaked_totalDistributed_activeStakes($self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes);
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_7);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), int) $TonCrown$_fun_getLevelCost((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $level) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    var $fresh$ret_8 = __tact_dict_get_int_int($self'levelCosts, 257, $level, 257);
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_8);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), tuple) $TonCrown$_fun_getVipConfig((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $vipClass) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    var $fresh$ret_9 = $VipConfig$_load_opt(__tact_dict_get_int_cell($self'vipConfigs, 257, $vipClass));
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_9);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), tuple) $TonCrown$_fun_getReferralNode((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, slice $address) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    var $fresh$ret_10 = $ReferralNode$_load_opt(__tact_dict_get_slice_cell($self'referralNodes, 267, $address));
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_10);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), slice) $TonCrown$_fun_getCreatorWallet((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self, int $walletId) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    if (($walletId == 1)) {
+        var $fresh$ret_11 = $self'creatorWallet1;
+        return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_11);
+    } elseif (($walletId == 2)) {
+        var $fresh$ret_12 = $self'creatorWallet2;
+        return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_12);
+    } elseif (($walletId == 3)) {
+        var $fresh$ret_13 = $self'creatorWallet3;
+        return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_13);
+    } elseif (($walletId == 4)) {
+        var $fresh$ret_14 = $self'creatorWallet4;
+        return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_14);
+    }
+    var $fresh$ret_15 = null();
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_15);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), int) $TonCrown$_fun_getContractBalance((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    var $fresh$ret_16 = $global_myBalance();
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_16);
+}
+
+((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int), int) $TonCrown$_fun_isPaused((slice, slice, slice, slice, slice, cell, cell, cell, cell, cell, int, int, int, int, int) $self) impure inline_ref {
+    var (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)) = $self;
+    var $fresh$ret_17 = $self'isPaused;
+    return (($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused), $fresh$ret_17);
+}
+
+;;
+;; Get methods of a Contract TonCrown
+;;
+
+_ %getUserInfo(slice $address) method_id(115232) {
+    slice $address = $address;
+    var self = $TonCrown$_contract_load();
+    var res = self~$TonCrown$_fun_getUserInfo($address);
+    return $User$_to_opt_external(res);
+}
+
+_ %getStakeInfo(slice $address) method_id(113842) {
+    slice $address = $address;
+    var self = $TonCrown$_contract_load();
+    var res = self~$TonCrown$_fun_getStakeInfo($address);
+    return $StakeInfo$_to_opt_external(res);
+}
+
+_ %getPlatformStats() method_id(87584) {
+    var self = $TonCrown$_contract_load();
+    var res = self~$TonCrown$_fun_getPlatformStats();
+    return $PlatformStats$_to_external(res);
+}
+
+_ %getLevelCost(int $level) method_id(68568) {
+    int $level = $level;
+    var self = $TonCrown$_contract_load();
+    var res = self~$TonCrown$_fun_getLevelCost($level);
+    return res;
+}
+
+_ %getVipConfig(int $vipClass) method_id(69540) {
+    int $vipClass = $vipClass;
+    var self = $TonCrown$_contract_load();
+    var res = self~$TonCrown$_fun_getVipConfig($vipClass);
+    return $VipConfig$_to_opt_external(res);
+}
+
+_ %getReferralNode(slice $address) method_id(95379) {
+    slice $address = $address;
+    var self = $TonCrown$_contract_load();
+    var res = self~$TonCrown$_fun_getReferralNode($address);
+    return $ReferralNode$_to_opt_external(res);
+}
+
+_ %getCreatorWallet(int $walletId) method_id(83900) {
+    int $walletId = $walletId;
+    var self = $TonCrown$_contract_load();
+    var res = self~$TonCrown$_fun_getCreatorWallet($walletId);
+    return res;
+}
+
+_ %getContractBalance() method_id(111492) {
+    var self = $TonCrown$_contract_load();
+    var res = self~$TonCrown$_fun_getContractBalance();
+    return res;
+}
+
+_ %isPaused() method_id(126174) {
+    var self = $TonCrown$_contract_load();
+    var res = self~$TonCrown$_fun_isPaused();
+    return res;
+}
+
+_ %owner() method_id(83229) {
+    var self = $TonCrown$_contract_load();
+    var res = self~$TonCrown$_fun_owner();
+    return res;
+}
+
+;;
+;; Routing of a Contract TonCrown
+;;
+
+;; message opcode reader utility: only binary receivers
+;; Returns 32 bit message opcode, otherwise throws the "Invalid incoming message" exit code
+(slice, int) ~load_opcode_internal(slice s) asm( -> 1 0) "32 LDUQ 130 THROWIFNOT";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    
+    ;; Context
+    var cs = in_msg_cell.begin_parse();
+    cs~skip_bits(2);
+    var msg_bounceable = cs~load_int(1);
+    var msg_bounced = cs~load_int(1);
+    slice msg_sender_addr = cs~load_msg_addr();
+    __tact_context = (msg_bounceable, msg_sender_addr, msg_value, cs);
+    __tact_context_sender = msg_sender_addr;
+    
+    ;; Load contract data
+    var ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused) = $TonCrown$_contract_load();
+    
+    ;; Handle bounced messages
+    if (msg_bounced) { return (); }
+    int op = 0;
+    int in_msg_length = slice_bits(in_msg);
+    if (in_msg_length >= 32) {
+        op = in_msg~load_uint(32);
+        ;; Receive Register message
+        if (op == 4151013294) {
+            var ($msg'referrerAddress) = in_msg~$Register$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireNotPaused();
+            slice $sender = __tact_context_get_sender();
+            throw_unless(32077, null?($User$_load_opt(__tact_dict_get_slice_cell($self'users, 267, $sender))));
+            int $now = $global_now();
+            var ($newUser'address, $newUser'referrer, $newUser'level, $newUser'vipClass, $newUser'directReferrals, $newUser'totalReferrals, $newUser'lastCheckIn, $newUser'levelExpiration, $newUser'totalEarned, $newUser'pendingRewards, $newUser'isActive, $newUser'registrationTime) = $User$_constructor_address_referrer_level_vipClass_directReferrals_totalReferrals_lastCheckIn_levelExpiration_totalEarned_pendingRewards_isActive_registrationTime($sender, $msg'referrerAddress, 0, 0, 0, 0, 0, 0, 0, 0, true, $now);
+            $self'users~__tact_dict_set_slice_cell(267, $sender, $User$_store_cell(($newUser'address, $newUser'referrer, $newUser'level, $newUser'vipClass, $newUser'directReferrals, $newUser'totalReferrals, $newUser'lastCheckIn, $newUser'levelExpiration, $newUser'totalEarned, $newUser'pendingRewards, $newUser'isActive, $newUser'registrationTime)));
+            $self'totalUsers = ($self'totalUsers + 1);
+            if ((~ null?($msg'referrerAddress))) {
+                ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_processReferralRegistration($sender, __tact_not_null($msg'referrerAddress));
+            }
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_reply(__gen_cell_cell_43268def76e967235b3dbd5229c150d9481b4aef510221aade99888078054917());
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive UpgradeLevel message
+        if (op == 984679371) {
+            var ($msg'targetLevel) = in_msg~$UpgradeLevel$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireNotPaused();
+            slice $sender = __tact_context_get_sender();
+            var ($currentUser'address, $currentUser'referrer, $currentUser'level, $currentUser'vipClass, $currentUser'directReferrals, $currentUser'totalReferrals, $currentUser'lastCheckIn, $currentUser'levelExpiration, $currentUser'totalEarned, $currentUser'pendingRewards, $currentUser'isActive, $currentUser'registrationTime) = ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireUserExists($sender);
+            throw_unless(4639, ($msg'targetLevel == ($currentUser'level + 1)));
+            throw_unless(12835, ( (($msg'targetLevel >= 1)) ? (($msg'targetLevel <= 10)) : (false) ));
+            int $levelCost = __tact_dict_get_int_int($self'levelCosts, 257, $msg'targetLevel, 257);
+            throw_unless(5856, (~ null?($levelCost)));
+            throw_unless(46647, ($Context$_get_value(__tact_context_get()) >= __tact_not_null($levelCost)));
+            $currentUser'level = $msg'targetLevel;
+            $currentUser'vipClass = ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_calculateVipClass($msg'targetLevel);
+            $currentUser'isActive = true;
+            if (($msg'targetLevel == 1)) {
+                $currentUser'levelExpiration = ($global_now() + 2592000);
+            }
+            $self'users~__tact_dict_set_slice_cell(267, $sender, $User$_store_cell(($currentUser'address, $currentUser'referrer, $currentUser'level, $currentUser'vipClass, $currentUser'directReferrals, $currentUser'totalReferrals, $currentUser'lastCheckIn, $currentUser'levelExpiration, $currentUser'totalEarned, $currentUser'pendingRewards, $currentUser'isActive, $currentUser'registrationTime)));
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_distributeLevelFees(__tact_not_null($levelCost), $sender);
+            if ((~ null?($currentUser'referrer))) {
+                ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_distributeLevelRenewalBonus(((__tact_not_null($levelCost) * 25) / 100), __tact_not_null($currentUser'referrer));
+            }
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_reply(__gen_cell_cell_a7ef7eeacd688b3f1e68960fd4243a16dffeef2eebd10bfac3708f4ab238a950());
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive CheckIn message
+        if (op == 928085272) {
+            var $msg = in_msg~$CheckIn$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireNotPaused();
+            slice $sender = __tact_context_get_sender();
+            var ($currentUser'address, $currentUser'referrer, $currentUser'level, $currentUser'vipClass, $currentUser'directReferrals, $currentUser'totalReferrals, $currentUser'lastCheckIn, $currentUser'levelExpiration, $currentUser'totalEarned, $currentUser'pendingRewards, $currentUser'isActive, $currentUser'registrationTime) = ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireUserExists($sender);
+            int $currentTime = $global_now();
+            throw_unless(13250, (($currentTime - $currentUser'lastCheckIn) >= 86400));
+            if (( (($currentUser'level == 1)) ? (($currentTime > $currentUser'levelExpiration)) : (false) )) {
+                $currentUser'isActive = false;
+                $currentUser'level = 0;
+                $self'users~__tact_dict_set_slice_cell(267, $sender, $User$_store_cell(($currentUser'address, $currentUser'referrer, $currentUser'level, $currentUser'vipClass, $currentUser'directReferrals, $currentUser'totalReferrals, $currentUser'lastCheckIn, $currentUser'levelExpiration, $currentUser'totalEarned, $currentUser'pendingRewards, $currentUser'isActive, $currentUser'registrationTime)));
+                ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_reply(__gen_cell_cell_1f5bceda88a1893f95b58a9c54309c6f8a830dafdc7c6a58a55fac9da7ba9650());
+                $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+                return ();
+            }
+            throw_unless(58238, ( (($currentUser'level > 0)) ? ($currentUser'isActive) : (false) ));
+            $currentUser'lastCheckIn = $currentTime;
+            $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet4, 10000000, 2, __gen_cell_cell_a6e732ee08dd643854086f4b6ce744f6979c2514d39a57fcbe4b24b9363ab9d5()));
+            $currentUser'totalEarned = ($currentUser'totalEarned + 10000000);
+            $self'users~__tact_dict_set_slice_cell(267, $sender, $User$_store_cell(($currentUser'address, $currentUser'referrer, $currentUser'level, $currentUser'vipClass, $currentUser'directReferrals, $currentUser'totalReferrals, $currentUser'lastCheckIn, $currentUser'levelExpiration, $currentUser'totalEarned, $currentUser'pendingRewards, $currentUser'isActive, $currentUser'registrationTime)));
+            $self'totalDistributed = ($self'totalDistributed + 10000000);
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_reply(__gen_cell_cell_181e3cd0195c5e2d059f5c4805caa0a87344a09d7c52be949de2d95881d2e692());
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive ClaimPendingRewards message
+        if (op == 3861925051) {
+            var $msg = in_msg~$ClaimPendingRewards$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireNotPaused();
+            slice $sender = __tact_context_get_sender();
+            var ($currentUser'address, $currentUser'referrer, $currentUser'level, $currentUser'vipClass, $currentUser'directReferrals, $currentUser'totalReferrals, $currentUser'lastCheckIn, $currentUser'levelExpiration, $currentUser'totalEarned, $currentUser'pendingRewards, $currentUser'isActive, $currentUser'registrationTime) = ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireUserExists($sender);
+            throw_unless(53827, ($currentUser'pendingRewards > 0));
+            int $claimAmount = $currentUser'pendingRewards;
+            $currentUser'pendingRewards = 0;
+            $self'users~__tact_dict_set_slice_cell(267, $sender, $User$_store_cell(($currentUser'address, $currentUser'referrer, $currentUser'level, $currentUser'vipClass, $currentUser'directReferrals, $currentUser'totalReferrals, $currentUser'lastCheckIn, $currentUser'levelExpiration, $currentUser'totalEarned, $currentUser'pendingRewards, $currentUser'isActive, $currentUser'registrationTime)));
+            $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet4, $claimAmount, 2, __gen_cell_cell_393b926661437aff27cb7723e4b03ce16100b2e666b5df78c842e1439b1fc385()));
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive StakeTON message
+        if (op == 4233037804) {
+            var ($msg'duration, $msg'autoRestake) = in_msg~$StakeTON$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireNotPaused();
+            slice $sender = __tact_context_get_sender();
+            var ($user'address, $user'referrer, $user'level, $user'vipClass, $user'directReferrals, $user'totalReferrals, $user'lastCheckIn, $user'levelExpiration, $user'totalEarned, $user'pendingRewards, $user'isActive, $user'registrationTime) = ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireUserExists($sender);
+            throw_unless(12510, ($user'vipClass > 0));
+            throw_unless(35448, ( (($msg'duration >= 14)) ? (($msg'duration <= 730)) : (false) ));
+            throw_unless(36963, ($Context$_get_value(__tact_context_get()) >= 1000000000));
+            tuple $existingStake = $StakeInfo$_load_opt(__tact_dict_get_slice_cell($self'stakes, 267, $sender));
+            throw_unless(29025, ( (null?($existingStake)) ? (true) : ((~ $StakeInfo$_get_isActive($StakeInfo$_not_null($existingStake)))) ));
+            var ($newStake'amount, $newStake'startTime, $newStake'duration, $newStake'vipClass, $newStake'autoRestake, $newStake'lastClaim, $newStake'totalClaimed, $newStake'isActive) = $StakeInfo$_constructor_amount_startTime_duration_vipClass_autoRestake_lastClaim_totalClaimed_isActive($Context$_get_value(__tact_context_get()), $global_now(), ($msg'duration * 86400), $user'vipClass, $msg'autoRestake, $global_now(), 0, true);
+            $self'stakes~__tact_dict_set_slice_cell(267, $sender, $StakeInfo$_store_cell(($newStake'amount, $newStake'startTime, $newStake'duration, $newStake'vipClass, $newStake'autoRestake, $newStake'lastClaim, $newStake'totalClaimed, $newStake'isActive)));
+            $self'totalStaked = ($self'totalStaked + $Context$_get_value(__tact_context_get()));
+            $self'activeStakes = ($self'activeStakes + 1);
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_reply(__gen_cell_cell_f7f445a74b74faa975bee433a4a482441f8f2fad1bb5779ad1b063891cf999b4());
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive ClaimStakingRewards message
+        if (op == 3410432642) {
+            var $msg = in_msg~$ClaimStakingRewards$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireNotPaused();
+            slice $sender = __tact_context_get_sender();
+            tuple $stake = $StakeInfo$_load_opt(__tact_dict_get_slice_cell($self'stakes, 267, $sender));
+            throw_unless(59270, (~ null?($stake)));
+            var ($currentStake'amount, $currentStake'startTime, $currentStake'duration, $currentStake'vipClass, $currentStake'autoRestake, $currentStake'lastClaim, $currentStake'totalClaimed, $currentStake'isActive) = $StakeInfo$_not_null($stake);
+            throw_unless(56818, $currentStake'isActive);
+            int $currentTime = $global_now();
+            int $daysSinceLastClaim = (($currentTime - $currentStake'lastClaim) / 86400);
+            throw_unless(54314, ($daysSinceLastClaim > 0));
+            tuple $vipConfig = $VipConfig$_load_opt(__tact_dict_get_int_cell($self'vipConfigs, 257, $currentStake'vipClass));
+            throw_unless(28097, (~ null?($vipConfig)));
+            int $dailyReward = (($currentStake'amount * $VipConfig$_get_stakingRoi($VipConfig$_not_null($vipConfig))) / 10000);
+            int $totalReward = ($dailyReward * $daysSinceLastClaim);
+            if (($currentTime >= ($currentStake'startTime + $currentStake'duration))) {
+                if ($currentStake'autoRestake) {
+                    $currentStake'startTime = $currentTime;
+                    $currentStake'lastClaim = $currentTime;
+                } else {
+                    $totalReward = ($totalReward + $currentStake'amount);
+                    $currentStake'isActive = false;
+                    $self'totalStaked = ($self'totalStaked - $currentStake'amount);
+                    $self'activeStakes = ($self'activeStakes - 1);
+                }
+            } else {
+                $currentStake'lastClaim = $currentTime;
+            }
+            $currentStake'totalClaimed = ($currentStake'totalClaimed + $totalReward);
+            $self'stakes~__tact_dict_set_slice_cell(267, $sender, $StakeInfo$_store_cell(($currentStake'amount, $currentStake'startTime, $currentStake'duration, $currentStake'vipClass, $currentStake'autoRestake, $currentStake'lastClaim, $currentStake'totalClaimed, $currentStake'isActive)));
+            $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet4, $totalReward, 2, __gen_cell_cell_092b05783494904177d61f721a8f9a9f61f56eaf60557448e45a0a042dea8c07()));
+            $self'totalDistributed = ($self'totalDistributed + $totalReward);
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive UnstakeTON message
+        if (op == 2691902268) {
+            var $msg = in_msg~$UnstakeTON$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireNotPaused();
+            slice $sender = __tact_context_get_sender();
+            tuple $stake = $StakeInfo$_load_opt(__tact_dict_get_slice_cell($self'stakes, 267, $sender));
+            throw_unless(59270, (~ null?($stake)));
+            var ($currentStake'amount, $currentStake'startTime, $currentStake'duration, $currentStake'vipClass, $currentStake'autoRestake, $currentStake'lastClaim, $currentStake'totalClaimed, $currentStake'isActive) = $StakeInfo$_not_null($stake);
+            throw_unless(11223, $currentStake'isActive);
+            int $currentTime = $global_now();
+            int $daysSinceLastClaim = (($currentTime - $currentStake'lastClaim) / 86400);
+            int $totalReturn = $currentStake'amount;
+            if (($daysSinceLastClaim > 0)) {
+                tuple $vipConfig = $VipConfig$_load_opt(__tact_dict_get_int_cell($self'vipConfigs, 257, $currentStake'vipClass));
+                if ((~ null?($vipConfig))) {
+                    int $dailyReward = (($currentStake'amount * $VipConfig$_get_stakingRoi($VipConfig$_not_null($vipConfig))) / 10000);
+                    $totalReturn = ($totalReturn + ($dailyReward * $daysSinceLastClaim));
+                }
+            }
+            $currentStake'isActive = false;
+            $self'stakes~__tact_dict_set_slice_cell(267, $sender, $StakeInfo$_store_cell(($currentStake'amount, $currentStake'startTime, $currentStake'duration, $currentStake'vipClass, $currentStake'autoRestake, $currentStake'lastClaim, $currentStake'totalClaimed, $currentStake'isActive)));
+            $self'totalStaked = ($self'totalStaked - $currentStake'amount);
+            $self'activeStakes = ($self'activeStakes - 1);
+            $global_send($SendParameters$_constructor_to_value_mode_body($self'creatorWallet4, $totalReturn, 2, __gen_cell_cell_566dd3ac8c2b8657d89ce109a0f631e63c030e7002e47e0376a399e76a2e2412()));
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive SetCreatorWallet message
+        if (op == 454567065) {
+            var ($msg'walletId, $msg'address) = in_msg~$SetCreatorWallet$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireOwner();
+            if (($msg'walletId == 1)) {
+                $self'creatorWallet1 = $msg'address;
+            } elseif (($msg'walletId == 2)) {
+                $self'creatorWallet2 = $msg'address;
+            } elseif (($msg'walletId == 3)) {
+                $self'creatorWallet3 = $msg'address;
+            } elseif (($msg'walletId == 4)) {
+                $self'creatorWallet4 = $msg'address;
+            } else {
+                throw_unless(27671, false);
+            }
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive UpdateVipConfig message
+        if (op == 112629374) {
+            var ($msg'vipClass, ($msg'config'dailyRoi, $msg'config'minLevel, $msg'config'maxLevel, $msg'config'stakingRoi)) = in_msg~$UpdateVipConfig$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireOwner();
+            throw_unless(37963, ( (($msg'vipClass >= 1)) ? (($msg'vipClass <= 4)) : (false) ));
+            $self'vipConfigs~__tact_dict_set_int_cell(257, $msg'vipClass, $VipConfig$_store_cell(($msg'config'dailyRoi, $msg'config'minLevel, $msg'config'maxLevel, $msg'config'stakingRoi)));
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive UpdateLevelCost message
+        if (op == 3820349697) {
+            var ($msg'level, $msg'cost) = in_msg~$UpdateLevelCost$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireOwner();
+            throw_unless(12835, ( (($msg'level >= 1)) ? (($msg'level <= 10)) : (false) ));
+            throw_unless(61962, ($msg'cost > 0));
+            $self'levelCosts~__tact_dict_set_int_int(257, $msg'level, $msg'cost, 257);
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive EmergencyPause message
+        if (op == 1064338113) {
+            var ($msg'paused) = in_msg~$EmergencyPause$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireOwner();
+            $self'isPaused = $msg'paused;
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive Deploy message
+        if (op == 0x946a98b6) {
+            var ($deploy'queryId) = in_msg~$Deploy$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_notify($DeployOk$_store_cell($DeployOk$_constructor_queryId($deploy'queryId)));
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+        ;; Receive ChangeOwner message
+        if (op == 0x819dbe99) {
+            var ($msg'queryId, $msg'newOwner) = in_msg~$ChangeOwner$_load_without_opcode();
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireOwner();
+            $self'owner = $msg'newOwner;
+            ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_reply($ChangeOwnerOk$_store_cell($ChangeOwnerOk$_constructor_queryId_newOwner($msg'queryId, $msg'newOwner)));
+            $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+            return ();
+        }
+        
+    }
+    ;; Empty Receiver and Text Receivers
+    var text_op = slice_hash(in_msg);
+    ;; Receive "withdraw" message
+    if (text_op == 0x158e394e7cc73a9aeb362957fe037665588aef16f3bd68580c13ab84097cf22a) {
+        ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_requireOwner();
+        $global_send($SendParameters$_constructor_to_value_mode_body($self'owner, 0, 130, __gen_cell_cell_41fbfd4f1d68b39e4bbb094a56c379ab1cce8b95011358d5c3eb38c7c376f771()));
+        $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+        return ();
+    }
+    ;; Receive "status" message
+    if (text_op == 0x8bab7bd9df7d417259df0dc41b0ffffd3925f5b462183ef6fdea533df98eb0a0) {
+        var ($stats'totalUsers, $stats'totalStaked, $stats'totalDistributed, $stats'activeStakes) = ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_getPlatformStats();
+        slice $statusMessage = __tact_string_builder_end_slice(__tact_string_builder_append_not_mut(__tact_string_builder_append_not_mut(__tact_string_builder_append_not_mut(__tact_string_builder_append_not_mut(__tact_string_builder_append_not_mut(__tact_string_builder_append_not_mut(__tact_string_builder_start_string(), __gen_slice_string_dd1d7c1de7251b5e9b43b786451168ee135d93bb0d518ce00b26206ecb2c5fe6()), $Int$_fun_toString($stats'totalUsers)), __gen_slice_string_df7558679b4b92821acaa8e4403cdcb27b03597886c1f510c4c2e90dcee0ff10()), $Int$_fun_toString($stats'totalStaked)), __gen_slice_string_64e30ccc378156915a128e17ae2d042eb37e4303f9c83c4054ac964e562ce4f5()), $Int$_fun_toString($stats'totalDistributed)));
+        ($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused)~$TonCrown$_fun_reply($String$_fun_asComment($statusMessage));
+        $TonCrown$_contract_store(($self'owner, $self'creatorWallet1, $self'creatorWallet2, $self'creatorWallet3, $self'creatorWallet4, $self'users, $self'stakes, $self'referralNodes, $self'levelCosts, $self'vipConfigs, $self'totalUsers, $self'totalStaked, $self'totalDistributed, $self'activeStakes, $self'isPaused));
+        return ();
+    }
+    ;; Throw if not handled
+    throw(130);
+}
+
+
+() __tact_selector_hack_asm() impure asm """
+@atend @ 1 {
+        execute current@ context@ current!
+        {
+            // The core idea of this function is to save gas by avoiding unnecessary dict jump, when recv_internal/recv_external is called
+            // We want to extract recv_internal/recv_external from the dict and select needed function
+            // not by jumping to the needed function by it's index, but by using usual IF statements.
+
+            }END> b> // Close previous builder, now we have a cell of previous code on top of the stack
+
+            <{ // Start of the new code builder
+                SETCP0
+                // Swap the new code builder with the previous code, now we have previous code on top of the stack
+                swap
+                // Transform cell to slice and load first ref from the previous code, now we have the dict on top of the stack
+                <s ref@
+
+                // Extract the recv_internal from the dict
+                dup 0 swap @procdictkeylen idict@ { "internal shortcut error" abort } ifnot
+                swap
+
+                // Delete the recv_internal from the dict
+                0 swap @procdictkeylen idict- drop
+                // Delete the recv_external from the dict (it's okay if it's not there)
+                -1 swap @procdictkeylen idict- drop
+                // Delete the __tact_selector_hack from the dict
+                65535 swap @procdictkeylen idict- drop
+
+                // Bring the code builder from the bottom of the stack
+                // because if recv_external extraction is optional, and the number of elements on the stack is not fixed
+                depth 1- roll
+                // Swap with the dict from which we extracted recv_internal and (maybe) recv_external
+                swap
+
+                // Check if the dict is empty
+                dup null?
+                // Store a copy of this flag in the bottom of the stack
+                dup depth 1- -roll
+                {
+                    // If the dict is empty, just drop it (it will be null if it's empty)
+                    drop
+                }
+                {
+                    // If the dict is not empty, prepare continuation to be stored in c3
+                    <{
+                        // Save this dict as first ref in this continuation, it will be pushed in runtime by DICTPUSHCONST
+                        swap @procdictkeylen DICTPUSHCONST
+                        // Jump to the needed function by it's index
+                        DICTIGETJMPZ
+                        // If such key is not found, throw 11 along with the key as an argument
+                        11 THROWARG
+                    }> PUSHCONT
+                    // Store the continuation in c3
+                    c3 POP
+                } cond
+
+                // Function id is on top of the (runtime) stack
+                DUP IFNOTJMP:<{
+                    // place recv_internal here
+                    DROP swap @addop
+                }>
+
+                // Bring back the flag, indicating if the dict is empty or not from the bottom of the stack
+                depth 1- roll
+                {
+                    // If the dict is empty, throw 11
+                    11 THROWARG
+                }
+                {
+                    // If the dict is not empty, jump to continuation from c3
+                    c3 PUSH JMPX
+                } cond
+            }> b>
+        } : }END>c
+        current@ context! current!
+    } does @atend !
+""";
+
+() __tact_selector_hack() method_id(65535) {
+    return __tact_selector_hack_asm();
+}

