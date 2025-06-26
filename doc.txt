@@ -1,0 +1,125 @@
+Functions
+User Registration and Referral System
+receive(msg: Register)
+Registers a new user. If a referrer is provided, the referral system is updated.
+
+REACT INTEGRATION:
+Use a form to collect the user's address and optional referrer address. Call this function via a transaction.
+
+fun processReferralRegistration(newUser: Address, referrer: Address)
+Handles referral logic for new users.
+
+Level Upgrade System
+receive(msg: UpgradeLevel)
+Allows users to upgrade their level sequentially by paying the required TON amount.
+React Integration:
+Display the user's current level and the cost for the next level. Trigger this function when the user clicks "Upgrade Level."
+
+fun calculateVipClass(level: Int): Int
+Determines the VIP class based on the user's level.
+
+Staking System
+receive(msg: StakeTON)
+Allows VIP users to stake TON tokens for rewards.
+React Integration:
+Provide a form to input staking duration and auto-restake preference. Call this function via a transaction.
+
+receive(msg: ClaimStakingRewards)
+Allows users to claim staking rewards.
+React Integration:
+Add a "Claim Rewards" button that triggers this function.
+
+receive(msg: UnstakeTON)
+Allows users to unstake their tokens.
+React Integration:
+Add an "Unstake" button that triggers this function.
+
+Reward Distribution
+receive(msg: CheckIn)
+Allows users to check in daily for rewards.
+React Integration:
+Add a "Daily Check-In" button that triggers this function.
+
+receive(msg: ClaimPendingRewards)
+Allows users to claim pending rewards.
+React Integration:
+Add a "Claim Pending Rewards" button that triggers this function.
+
+Administrative Functions
+receive(msg: SetCreatorWallet)
+Updates the creator wallet addresses.
+React Integration:
+Provide an admin-only interface to update wallet addresses.
+
+receive(msg: UpdateVipConfig)
+Updates VIP configurations.
+React Integration:
+Provide an admin-only interface to update VIP configurations.
+
+receive(msg: UpdateLevelCost)
+Updates level costs.
+React Integration:
+Provide an admin-only interface to update level costs.
+
+receive(msg: EmergencyPause)
+Pauses or unpauses the contract.
+React Integration:
+Provide an admin-only toggle for pausing/unpausing the contract.
+
+View Functions
+get fun getUserInfo(address: Address): User?
+Retrieves user information.
+React Integration:
+Fetch and display user details on the dashboard.
+
+get fun getStakeInfo(address: Address): StakeInfo?
+Retrieves staking information for a user.
+React Integration:
+Fetch and display staking details on the user's profile.
+
+get fun getPlatformStats(): PlatformStats
+Retrieves platform statistics.
+React Integration:
+Display platform stats on the homepage or admin dashboard.
+
+get fun getLevelCost(level: Int): Int?
+Retrieves the cost for a specific level.
+React Integration:
+Display level costs in the upgrade section.
+
+get fun getVipConfig(vipClass: Int): VipConfig?
+Retrieves VIP configuration details.
+React Integration:
+Display VIP benefits on the user's profile.
+
+get fun getReferralNode(address: Address): ReferralNode?
+Retrieves referral node information.
+React Integration:
+Display referral details on the user's profile.
+
+get fun getCreatorWallet(walletId: Int): Address?
+Retrieves creator wallet addresses.
+React Integration:
+Display wallet addresses in the admin panel.
+
+get fun getContractBalance(): Int
+Retrieves the contract's balance.
+React Integration:
+Display the contract balance in the admin dashboard.
+
+get fun isPaused(): Bool
+Checks if the contract is paused.
+React Integration:
+Display the paused state in the admin panel.
+
+React Integration
+Setup
+Install TON SDK:
+Use a library like @ton/core OR ton-connect to interact with the contract.
+
+Connect Wallet:
+Integrate a TON wallet (e.g., Tonkeeper) for user authentication and transactions from frontend to look for wallets.
+
+Contract Address:
+Use the deployed contract address to interact with the TonCrown contract:
+"0QDMixPIWRosGle-BviB1ByuQbhOS2DLYzL6GWjg6NwvbdSR

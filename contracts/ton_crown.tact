@@ -163,16 +163,16 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.isPaused = false;
         
         // Initialize level costs (in TON)
-        self.levelCosts.set(1, ton("0.05"));
-        self.levelCosts.set(2, ton("0.1"));
-        self.levelCosts.set(3, ton("0.2"));
-        self.levelCosts.set(4, ton("0.5"));
-        self.levelCosts.set(5, ton("1"));
-        self.levelCosts.set(6, ton("2"));
-        self.levelCosts.set(7, ton("5"));
-        self.levelCosts.set(8, ton("10"));
-        self.levelCosts.set(9, ton("20"));
-        self.levelCosts.set(10, ton("50"));
+        self.levelCosts.set(1, ton("1.25"));
+        self.levelCosts.set(2, ton("2.51"));
+        self.levelCosts.set(3, ton("3.77"));
+        self.levelCosts.set(4, ton("5.03"));
+        self.levelCosts.set(5, ton("6.27"));
+        self.levelCosts.set(6, ton("7.53"));
+        self.levelCosts.set(7, ton("8.78"));
+        self.levelCosts.set(8, ton("10.04"));
+        self.levelCosts.set(9, ton("11.29"));
+        self.levelCosts.set(10, ton("12.55"));
         
         // Initialize VIP configurations
         self.vipConfigs.set(1, VipConfig{
