@@ -1,6 +1,6 @@
 # Tact compilation report
 Contract: TonCrown
-BoC Size: 7987 bytes
+BoC Size: 7986 bytes
 
 ## Structures (Structs and Messages)
 Total structures: 32

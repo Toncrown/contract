@@ -33,7 +33,7 @@ export const config = {
         testnet: async () => {
             const mnemonic = process.env.MNEMONIC?.split(' ');
             if (!mnemonic || mnemonic.length !== 12) {
-                throw new Error('❌ Please set a valid 12-word MNEMONIC in your environment variables.');
+                throw new Error(' Please set a valid 12-word MNEMONIC in your environment variables.');
             }
 
             const key = await mnemonicToWalletKey(mnemonic);

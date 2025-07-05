@@ -1,5 +1,5 @@
 import { toNano } from '@ton/core';
-import { TonCrown } from '../build/TonCrown/TonCrown_TonCrown';
+import { TonCrown } from '../contracts/ton_crown.tact_TonCrown';
 import { NetworkProvider } from '@ton/blueprint';
 import 'dotenv/config';
 
