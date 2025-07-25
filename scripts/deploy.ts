@@ -1,80 +1,52 @@
-import { toNano } from '@ton/core';
-import { TonCrown } from '../contracts/ton_crown.tact_TonCrown';
-import { NetworkProvider } from '@ton/blueprint';
-import 'dotenv/config';
+import { toNano, Address } from '@ton/core';
+import { TonCrown } from '../build/TonCrown/TonCrown_TonCrown'; // Ensure this path is correct based on your build output
+import { NetworkProvider, compile } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
-    // Get the deployer's address as the owner
-    const owner = provider.sender().address!;
-    
-    console.log('Deploying TonCrown contract...');
-    console.log('Owner address:', owner.toString());
-    
-    // Initialize the contract with the owner address
+    const sender = provider.sender();
+    const ownerAddress = sender.address;
+    if (!ownerAddress) {
+        throw new Error("Cannot get sender address from provider.");
+    }
+
+    console.log(`Deploying TonCrown contract...`);
+    console.log(`Owner/Deployer Address: ${ownerAddress.toString()}`);
+
+    // Compile the contract to get the latest code cell
+    // This is optional if your build process is reliable, but good for certainty
+    await compile('TonCrown'); 
+
+    // Create the contract instance with fromInit to get the stateInit
     const tonCrown = provider.open(
-        await TonCrown.fromInit(owner)
+        await TonCrown.fromInit(ownerAddress)
     );
-    
-    console.log('Contract address:', tonCrown.address.toString());
-    
-    // Deploy the contract
+
+    console.log(`New contract address will be: ${tonCrown.address.toString()}`);
+    console.log("Sending deployment transaction...");
+
+    // Send the deployment transaction
     await tonCrown.send(
-        provider.sender(),
+        sender,
         {
-            value: toNano('0.1'), // Increased deployment fee for contract complexity
+            value: toNano('0.5'), // Send enough TON for gas and initial balance
         },
         {
             $$type: 'Deploy',
             queryId: 0n,
         }
     );
-    
-    console.log('Waiting for contract deployment...');
+
+    // Wait for the transaction to be confirmed and the contract to appear on-chain
+    console.log('Waiting for contract deployment to be confirmed...');
     await provider.waitForDeploy(tonCrown.address);
-    
+
     console.log('✅ Contract deployed successfully!');
-    
-    // Optional: Test some view functions after deployment
-    try {
-        const platformStats = await tonCrown.getGetPlatformStats();
-        console.log('Platform stats:', {
-            totalUsers: platformStats.totalUsers.toString(),
-            totalStaked: platformStats.totalStaked.toString(),
-            totalDistributed: platformStats.totalDistributed.toString(),
-            activeStakes: platformStats.activeStakes.toString()
-        });
-        
-        const isPaused = await tonCrown.getIsPaused();
-        console.log('Contract paused:', isPaused);
-        
-        // Check some level costs
-        const level1Cost = await tonCrown.getGetLevelCost(1n);
-        const level5Cost = await tonCrown.getGetLevelCost(5n);
-        console.log('Level costs:', {
-            level1: level1Cost?.toString() + ' nanoTON',
-            level5: level5Cost?.toString() + ' nanoTON'
-        });
-        
-        // Check creator wallets
-        const wallet1 = await tonCrown.getGetCreatorWallet(1n);
-        const wallet2 = await tonCrown.getGetCreatorWallet(2n);
-        const wallet3 = await tonCrown.getGetCreatorWallet(3n);
-        console.log('Creator wallets:', {
-            wallet1: wallet1?.toString(),
-            wallet2: wallet2?.toString(),
-            wallet3: wallet3?.toString()
-        });
-        
-    } catch (error) {
-        console.log('Note: Some view functions may not be available immediately after deployment');
-        console.log('Error details:', error);
-    }
-    
-    console.log('\n📋 Deployment Summary:');
-    console.log('Contract: TonCrown');
-    console.log('Address:', tonCrown.address.toString());
-    console.log('Owner:', owner.toString());
-    console.log('Network:', provider.network());
-    
-    return tonCrown;
+    console.log('---------------------------------');
+    console.log('📋 Deployment Summary:');
+    console.log('   -> Contract: TonCrown');
+    console.log(`   -> Address: ${tonCrown.address.toString()}`);
+    console.log(`   -> Owner: ${ownerAddress.toString()}`);
+    console.log(`   -> Network: ${provider.network()}`);
+    console.log('---------------------------------');
+    console.log('You can now update the CONTRACT_ADDRESS in your DApp with the new address above.');
 }
