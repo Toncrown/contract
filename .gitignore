@@ -22,3 +22,4 @@ Session.vim
 .emacs/
 .helix/
 .env
+.env.example

@@ -1,43 +1,8 @@
-//toncrown.tact
 import "@stdlib/deploy";
 import "@stdlib/ownable";
-// NOTE: Crypto functions like .hash() and checkSignature() are built-in and do not require any import.
 
-// --- Structs and Messages ---
 
-// Used for parsing the forward payload from a Jetton transfer
-struct StakeUsdtPayload {
-    duration: Int as uint32;
-    autoRestake: Bool;
-    referrerAddress: Address?;
-}
-
-// TEP-74 Jetton transfer notification message
-message(0x7362d09c) JettonTransferNotification {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    sender: Address;
-    forwardPayload: Slice as remaining;
-}
-
-// TEP-74 Jetton transfer message for sending Jettons from the contract
-message(0x0f8a7ea5) JettonTransfer {
-    queryId: Int as uint64;
-    amount: Int as coins;
-    destination: Address;
-    response_destination: Address;
-    custom_payload: Cell?;
-    forward_ton_amount: Int as coins;
-    forward_payload: Slice as remaining;
-}
-
-// Message for receiving signed price data from the oracle
-message SignedPriceData {
-    signature: Slice;
-    dataCell: Cell;
-}
-
-// Represents a single staking position for a user
+//STRUCTS AND MESSAGES
 struct StakeInfo {
     stakeId: Int as uint16;
     amount: Int as coins;
@@ -48,10 +13,9 @@ struct StakeInfo {
     lastClaim: Int as uint32;
     totalClaimed: Int as coins;
     isActive: Bool;
-    stakedAsset: Int as uint8; // 0 for TON, 1 for USDT
+    stakedAsset: Int as uint8;
 }
 
-// Represents a user on the platform
 struct User {
     referrer: Address?;
     level: Int as uint8;
@@ -62,7 +26,6 @@ struct User {
     lastCheckIn: Int as uint32;
     levelExpiration: Int as uint32;
     totalEarned: Int as coins;
-    pendingRewards: Int as coins;
     isActive: Bool;
     registrationTime: Int as uint32;
     stakeCounter: Int as uint16;
@@ -86,6 +49,8 @@ struct PlatformStats {
     activeStakes: Int as uint32;
 }
 
+
+//INCOMING USER ACTION MESSAGES
 message UpgradeLevel {
     targetLevel: Int as uint8;
     referrerAddress: Address?;
@@ -94,7 +59,6 @@ message UpgradeLevel {
 message CheckIn {}
 
 message StakeTON {
-    amount: Int as coins;
     duration: Int as uint32;
     autoRestake: Bool;
     referrerAddress: Address?;
@@ -104,33 +68,71 @@ message ClaimStakingRewards {
     stakeId: Int as uint16;
 }
 
-message ClaimPendingRewards {}
-
-message SetUsdtJettonWallet {
-    wallet: Address;
-}
-
 message UpdateAutoRestake {
     stakeId: Int as uint16;
     autoRestake: Bool;
 }
 
+
+//INCOMING JETTON MESSAGES
+struct StakeUsdtPayload {
+    duration: Int as uint32;
+    autoRestake: Bool;
+    referrerAddress: Address?;
+}
+
+message(0x7362d09c) JettonTransferNotification {
+    queryId: Int as uint64;
+    amount: Int as coins;
+    sender: Address;
+    forwardPayload: Slice as remaining;
+}
+
+message(0x0f8a7ea5) JettonTransfer {
+    queryId: Int as uint64;
+    amount: Int as coins;
+    destination: Address;
+    response_destination: Address;
+    custom_payload: Cell?;
+    forward_ton_amount: Int as coins;
+    forward_payload: Slice as remaining;
+}
+
+
+//INCOMING DISTRIBUTOR MESSAGES
+message DistributeDailyRewards {
+    user: Address;
+    stakeId: Int as uint16;
+}
+
+
+//OWNER ACTION MESSAGES
 message UpdateLevelCost {
     level: Int as uint8;
     cost: Int as coins;
 }
 
+message SetUsdtJettonWallet {
+    wallet: Address;
+}
 
+message SetDistributor {
+    address: Address;
+}
+
+
+
+//MONTRACT INITIALIZATION: TONCROWN
 contract TonCrown with Deployable, OwnableTransferable {
 
-    // --- State Variables ---
+    //STATE VARIABLES
     owner: Address;
     creatorWallet1: Address;
     creatorWallet2: Address;
     creatorWallet3: Address;
     creatorWallet4: Address;
     usdtJettonWalletAddress: Address;
-    tonPriceInUsdt: Int as uint64;
+    distributorAddress: Address;
 
     users: map<Address, User>;
     levelCosts: map<Int, Int>;
@@ -148,36 +150,26 @@ contract TonCrown with Deployable, OwnableTransferable {
     spilloverCycle: Int as uint64;
     userLastCycle: map<Address, Int as uint64>;
 
-    // Oracle details are standard state variables, initialized once in init()
-    oracleAddress: Address;
-    oraclePubKey: Int;
-
-    // --- Constants ---
+    //CONSTANTS
     const DAILY_CHECKIN_REWARD: Int = ton("0.01");
     const LEVEL1_DURATION: Int = 2592000;
-    const MIN_STAKE_DURATION: Int = 14;
+    const MIN_STAKE_DURATION: Int = 14; 
     const MAX_STAKE_DURATION: Int = 730;
     const MAX_DIRECT_REFERRALS: Int = 6;
     const SECONDS_PER_DAY: Int = 86400;
     const ASSET_TON: Int = 0;
     const ASSET_USDT: Int = 1;
-    const OP_STAKE_USDT: Int = 1;
-    const OP_STAKE_TON_WITH_USDT: Int = 2;
+    const DISTRIBUTION_GAS_FEE: Int = ton("0.005");
 
-    // FIX: Revert to the simpler init pattern from the working version.
     init(owner: Address) {
         self.owner = owner;
-        self.usdtJettonWalletAddress = owner;
-        self.tonPriceInUsdt = 0;
-
-        // Hardcode addresses inside init(), using the raw base64 format for the oracle.
-        self.oracleAddress = address("EQA+X+2041+9HPwzP1g2T1+hGl12jtn9WvsI/t6p/6pcJK6wV");
-        self.oraclePubKey = 0x5503062D84C92A40D0E3A21E560C6C42E49572A1035D0C61975850935A5477C2;
-
         self.creatorWallet1 = address("0QAzL_NTGF3Z1mgNIV6jf1qxEdXgxd67Zf6i7ZDm70Xqa7Ts");
         self.creatorWallet2 = address("0QAtYOHIpbdZL0_04aXSg5aZLT0LaQNOrl858DlUoKyqcMcm");
         self.creatorWallet3 = address("0QCtNZf0MCqmy558C2zgtzK7i69gg0ttOBWmZ-88ScJp4_Cz");
         self.creatorWallet4 = address("0QDMixPIWRosGle-BviB1ByuQbhOS2DLYzL6GWjg6NwvbdSR");
+
+        self.usdtJettonWalletAddress = owner; 
+        self.distributorAddress = owner;
 
         self.totalUsers = 0;
         self.totalStakedTon = 0;
@@ -207,6 +199,198 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.vipConfigs.set(4, VipConfig{ dailyRoi: 250, minLevel: 10, maxLevel: 10, stakingRoi: 250 });
     }
 
+
+    //RECIEVER FUNCTIONS
+    receive(msg: UpgradeLevel) {
+        self.requireNotPaused();
+
+        let sender: Address = sender();
+        let originalReferrer: Address? = msg.referrerAddress;
+        let currentUser: User = self.getOrRegisterUser(sender, originalReferrer);
+
+        require(msg.targetLevel == currentUser.level + 1, "Must upgrade sequentially");
+        let levelCost: Int = self.levelCosts.get(msg.targetLevel)!!;
+        require(context().value >= levelCost, "Insufficient payment");
+
+        let oldLevel: Int = currentUser.level;
+        currentUser.level = msg.targetLevel;
+        currentUser.vipClass = self.calculateVipClass(msg.targetLevel);
+        currentUser.isActive = true;
+        if (msg.targetLevel == 1) {
+            currentUser.levelExpiration = now() + self.LEVEL1_DURATION;
+        }
+        self.users.set(sender, currentUser);
+
+        self.distributeFunds(levelCost, sender, oldLevel + 1, originalReferrer);
+        self.reply("Level upgrade successful".asComment());
+    }
+
+    receive(msg: CheckIn) {
+        self.requireNotPaused();
+        let sender: Address = sender();
+        let currentUser: User = self.requireUserExists(sender);
+        let currentTime: Int = now();
+
+        require(currentTime - currentUser.lastCheckIn >= self.SECONDS_PER_DAY, "Already checked in today");
+
+        if (currentUser.level == 1 && currentTime > currentUser.levelExpiration) {
+            currentUser.isActive = false;
+            currentUser.level = 0;
+            self.users.set(sender, currentUser);
+            self.reply("Level expired - please upgrade".asComment());
+            return;
+        }
+
+        require(currentUser.level > 0 && currentUser.isActive, "Must have an active level to check in");
+
+        currentUser.lastCheckIn = currentTime;
+        let reward: Int = self.DAILY_CHECKIN_REWARD;
+
+        currentUser.totalEarned = currentUser.totalEarned + reward;
+        self.users.set(sender, currentUser);
+        self.totalDistributed = self.totalDistributed + reward;
+
+        send(SendParameters{ 
+            to: sender,
+            value: reward,
+            mode: SendIgnoreErrors,
+            body: "Daily Check-in Reward".asComment()
+        });
+
+        self.reply("Check-in successful. Your reward has been sent to your wallet.".asComment());
+    }
+
+    receive(msg: StakeTON) {
+        self.requireNotPaused();
+        let sender: Address = sender();
+        let user: User = self.getOrRegisterUser(sender, msg.referrerAddress);
+
+        require(user.vipClass > 0, "VIP status required for staking");
+        require(msg.duration >= self.MIN_STAKE_DURATION && msg.duration <= self.MAX_STAKE_DURATION, "Invalid staking duration");
+
+        let stakeAmount: Int = context().value - ton("0.1");
+        require(stakeAmount > 0, "Insufficient value for staking");
+
+        let minStakeTon: Int = self.getMinStakeTon(user.vipClass);
+        require(stakeAmount >= minStakeTon, "Stake amount is below the minimum for your VIP level");
+
+        let stakeId: Int = user.stakeCounter;
+        let newStake: StakeInfo = StakeInfo{
+            stakeId: stakeId,
+            amount: stakeAmount,
+            startTime: now(),
+            duration: msg.duration * self.SECONDS_PER_DAY,
+            vipClass: user.vipClass,
+            autoRestake: msg.autoRestake,
+            lastClaim: now(),
+            totalClaimed: 0,
+            isActive: true,
+            stakedAsset: self.ASSET_TON
+        };
+
+        user.stakes.set(stakeId, newStake);
+        user.stakeCounter += 1;
+        self.users.set(sender, user);
+
+        self.totalStakedTon += stakeAmount;
+        self.activeStakes += 1;
+
+        send(SendParameters{ to: self.creatorWallet3, value: stakeAmount, mode: SendIgnoreErrors, body: "TON Staking Capital".asComment() });
+        self.reply("Staking successful".asComment());
+    }
+    
+    receive(msg: JettonTransferNotification) {
+        self.requireNotPaused();
+        require(sender() == self.usdtJettonWalletAddress, "Notification from unknown jetton wallet");
+
+        let stakerAddress: Address = msg.sender;
+        let usdtReceived: Int = msg.amount;
+
+        let payloadSlice: Slice = msg.forwardPayload;
+        let payload: StakeUsdtPayload = StakeUsdtPayload{
+            duration: payloadSlice.loadUint(32),
+            autoRestake: payloadSlice.loadBool(),
+            referrerAddress: payloadSlice.loadAddress()
+        };
+
+        let user: User = self.getOrRegisterUser(stakerAddress, payload.referrerAddress);
+        require(user.vipClass > 0, "VIP status required for staking");
+        require(payload.duration >= self.MIN_STAKE_DURATION && payload.duration <= self.MAX_STAKE_DURATION, "Invalid staking duration");
+
+        let minStakeUsd6: Int = self.getMinStakeInUsd6Decimals(user.vipClass);
+        require(usdtReceived >= minStakeUsd6, "Stake amount is below the minimum for your VIP level");
+
+        let stakeId: Int = user.stakeCounter;
+        let newStake: StakeInfo = StakeInfo{
+            stakeId: stakeId,
+            amount: usdtReceived,
+            startTime: now(),
+            duration: payload.duration * self.SECONDS_PER_DAY,
+            vipClass: user.vipClass,
+            autoRestake: payload.autoRestake,
+            lastClaim: now(),
+            totalClaimed: 0,
+            isActive: true,
+            stakedAsset: self.ASSET_USDT
+        };
+
+        user.stakes.set(stakeId, newStake);
+        user.stakeCounter += 1;
+
+        self.users.set(stakerAddress, user);
+        self.totalStakedUsdt += usdtReceived;
+        self.activeStakes += 1;
+
+        send(SendParameters{
+            to: self.usdtJettonWalletAddress, value: ton("0.1"), mode: SendIgnoreErrors,
+            body: JettonTransfer{
+                queryId: 0, amount: usdtReceived, destination: self.creatorWallet3,
+                response_destination: self.owner, custom_payload: null, forward_ton_amount: ton("0.005"),
+                forward_payload: "USDT Staking Capital".asComment().asSlice()
+            }.toCell()
+        });
+    }
+
+    receive(msg: ClaimStakingRewards) {
+        self.requireNotPaused();
+        let sender: Address = sender();
+        self.processRewardPayout(sender, msg.stakeId);
+    }
+    
+    receive(msg: DistributeDailyRewards) {
+        require(sender() == self.distributorAddress, "Not authorized to distribute rewards");
+        self.requireNotPaused();
+        self.processRewardPayout(msg.user, msg.stakeId);
+    }
+    
+    receive(msg: UpdateAutoRestake) {
+        self.requireNotPaused();
+        let sender: Address = sender();
+        let user: User = self.requireUserExists(sender);
+        let stake: StakeInfo? = user.stakes.get(msg.stakeId);
+        require(stake != null && stake!!.isActive, "No active stake");
+        let mutableStake: StakeInfo = stake!!;
+        mutableStake.autoRestake = msg.autoRestake;
+        user.stakes.set(msg.stakeId, mutableStake);
+        self.users.set(sender, user);
+        self.reply("Auto-restake preference updated".asComment());
+    }
+
+    receive(msg: UpdateLevelCost) {
+        self.requireOwner();
+        self.levelCosts.set(msg.level, msg.cost);
+    }
+
+    receive(msg: SetUsdtJettonWallet) {
+        self.requireOwner();
+        self.usdtJettonWalletAddress = msg.wallet;
+    }
+    
+    receive(msg: SetDistributor) {
+        self.requireOwner();
+        self.distributorAddress = msg.address;
+    }
+
     fun requireNotPaused() {
         require(!self.isPaused, "Contract is paused");
     }
@@ -216,19 +400,35 @@ contract TonCrown with Deployable, OwnableTransferable {
         require(userData != null, "User not registered. Please upgrade a level or stake first.");
         return userData!!;
     }
-    
+
+    fun calculateVipClass(level: Int): Int {
+        if (level >= 4 && level <= 6) { return 1; }
+        else if (level >= 7 && level <= 8) { return 2; }
+        else if (level >= 9) { return 3; }
+        return 0;
+    }
+
+    fun getMinStakeTon(vipClass: Int): Int {
+        if (vipClass == 1) { return ton("2"); }
+        if (vipClass == 2) { return ton("50"); }
+        if (vipClass >= 3) { return ton("100"); }
+        require(false, "Invalid VIP Class");
+        return 0;
+    }
+
     fun getMinStakeInUsd6Decimals(vipClass: Int): Int {
         if (vipClass == 1) { return 10 * 1000000; }
         if (vipClass == 2) { return 50 * 1000000; }
         if (vipClass >= 3) { return 300 * 1000000; }
-        throw(101); // Exit code for Invalid VIP Class
+        require(false, "Invalid VIP Class");
+        return 0; 
     }
-
+    
     fun getOrRegisterUser(userAddress: Address, referrerAddress: Address?): User {
         let userData: User? = self.users.get(userAddress);
-        if (userData != null) {
-            return userData!!;
-        }
+        if (userData != null){
+                return userData!!;
+            }
 
         let now: Int = now();
         let newUser: User = User{
@@ -241,7 +441,6 @@ contract TonCrown with Deployable, OwnableTransferable {
             lastCheckIn: 0,
             levelExpiration: 0,
             totalEarned: 0,
-            pendingRewards: 0,
             isActive: true,
             registrationTime: now,
             stakeCounter: 0,
@@ -269,9 +468,7 @@ contract TonCrown with Deployable, OwnableTransferable {
             self.users.set(newUser, user);
             return;
         }
-
         let referrerUser: User = referrerUserOpt!!;
-
         if (referrerUser.directReferrals < self.MAX_DIRECT_REFERRALS) {
             referrerUser.directReferrals += 1;
             referrerUser.totalReferrals += 1;
@@ -289,14 +486,12 @@ contract TonCrown with Deployable, OwnableTransferable {
     fun findAndAssignSpillover(originalReferrer: Address, newUser: Address) {
         let originalReferrerUser: User = self.users.get(originalReferrer)!!;
         let numDirectDownlines: Int = originalReferrerUser.directReferrals;
-
         if (numDirectDownlines > 0) {
             let i: Int = 0;
             while (i < numDirectDownlines) {
                 let downlineNum: Int = (originalReferrerUser.spilloverIndex + i) % numDirectDownlines + 1;
                 let downlineAddress: Address = originalReferrerUser.downlines.get(downlineNum)!!;
                 let downlineUser: User = self.users.get(downlineAddress)!!;
-
                 if (downlineUser.directReferrals < self.MAX_DIRECT_REFERRALS) {
                     downlineUser.directReferrals += 1;
                     downlineUser.totalReferrals += 1;
@@ -315,7 +510,6 @@ contract TonCrown with Deployable, OwnableTransferable {
                 i += 1;
             }
         }
-
         let queue: map<Int, Address> = emptyMap();
         let visited: map<Address, Bool> = emptyMap();
         let queueHead: Int = 0;
@@ -349,7 +543,6 @@ contract TonCrown with Deployable, OwnableTransferable {
                 self.users.set(originalReferrer, originalReferrerUser);
                 return;
             }
-
             let j: Int = 1;
             while (j <= currentUser.directReferrals) {
                 let nextDownlineAddress: Address = currentUser.downlines.get(j)!!;
@@ -367,39 +560,7 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.users.set(newUser, newUserStruct);
     }
 
-    receive(msg: UpgradeLevel) {
-        self.requireNotPaused();
-        let sender: Address = sender();
-
-        let originalReferrer: Address? = msg.referrerAddress;
-        let currentUser: User = self.getOrRegisterUser(sender, originalReferrer);
-
-        require(msg.targetLevel == currentUser.level + 1, "Must upgrade sequentially");
-        let levelCost: Int = self.levelCosts.get(msg.targetLevel)!!;
-        require(context().value >= levelCost, "Insufficient payment");
-
-        let oldLevel: Int = currentUser.level;
-        currentUser.level = msg.targetLevel;
-        currentUser.vipClass = self.calculateVipClass(msg.targetLevel);
-        currentUser.isActive = true;
-        if (msg.targetLevel == 1) {
-            currentUser.levelExpiration = now() + self.LEVEL1_DURATION;
-        }
-        self.users.set(sender, currentUser);
-
-        self.distributeFunds(levelCost, sender, oldLevel + 1, originalReferrer);
-        self.reply("Level upgrade successful".asComment());
-    }
-
-    fun calculateVipClass(level: Int): Int {
-        if (level >= 4 && level <= 6) { return 1; }
-        else if (level >= 7 && level <= 8) { return 2; }
-        else if (level >= 9) { return 3; }
-        return 0;
-    }
-
     fun distributeFunds(amount: Int, payer: Address, level: Int, originalReferrer: Address?) {
-        let unallocatedFunds: Int = amount;
         let user: User = self.users.get(payer)!!;
         let actualReferrer: Address? = user.referrer;
 
@@ -408,11 +569,11 @@ contract TonCrown with Deployable, OwnableTransferable {
         let creator3Share: Int = amount * 10 / 100;
         let referralUplineShare: Int = (level == 1) ? amount * 50 / 100 : amount * 30 / 100;
         let spilloverShare: Int = amount * 20 / 100;
+        let unallocatedFunds: Int = amount - creator1Share - creator2Share - creator3Share;
 
         send(SendParameters{ to: self.creatorWallet1, value: creator1Share, mode: SendIgnoreErrors });
         send(SendParameters{ to: self.creatorWallet2, value: creator2Share, mode: SendIgnoreErrors });
         send(SendParameters{ to: self.creatorWallet3, value: creator3Share, mode: SendIgnoreErrors });
-        unallocatedFunds = unallocatedFunds - creator1Share - creator2Share - creator3Share;
 
         if (level == 1) {
             if (originalReferrer != null && actualReferrer != null && originalReferrer != actualReferrer) {
@@ -425,54 +586,37 @@ contract TonCrown with Deployable, OwnableTransferable {
             unallocatedFunds -= referralUplineShare;
         } else {
             let isSpillover: Bool = originalReferrer != null && actualReferrer != null && originalReferrer != actualReferrer;
-
             if (isSpillover) {
                 let splitShare: Int = referralUplineShare / 2;
-
                 let originalReferrerUser: User = self.users.get(originalReferrer!!)!!;
-                if (originalReferrerUser.level >= level) {
-                    send(SendParameters{ to: originalReferrer!!, value: splitShare, mode: SendIgnoreErrors });
-                } else {
-                    send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors });
-                }
-
+                if (originalReferrerUser.level >= level) { send(SendParameters{ to: originalReferrer!!, value: splitShare, mode: SendIgnoreErrors }); }
+                else { send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors }); }
                 let actualReferrerUser: User = self.users.get(actualReferrer!!)!!;
-                if (actualReferrerUser.level >= level) {
-                    send(SendParameters{ to: actualReferrer!!, value: splitShare, mode: SendIgnoreErrors });
-                } else {
-                    send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors });
-                }
+                if (actualReferrerUser.level >= level) { send(SendParameters{ to: actualReferrer!!, value: splitShare, mode: SendIgnoreErrors }); }
+                else { send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors }); }
 
             } else {
-                if (actualReferrer != null && self.users.get(actualReferrer!!)!!.level >= level) {
-                    send(SendParameters{ to: actualReferrer!!, value: referralUplineShare, mode: SendIgnoreErrors });
-                } else {
-                    send(SendParameters{ to: self.creatorWallet3, value: referralUplineShare, mode: SendIgnoreErrors });
-                }
+                if (actualReferrer != null && self.users.get(actualReferrer!!)!!.level >= level) { send(SendParameters{ to: actualReferrer!!, value: referralUplineShare, mode: SendIgnoreErrors }); }
+                else { send(SendParameters{ to: self.creatorWallet3, value: referralUplineShare, mode: SendIgnoreErrors }); }
             }
             unallocatedFunds -= referralUplineShare;
         }
 
         if (spilloverShare > 0) {
             let recipientFound: Bool = false;
-
             if (self.totalUsers > 0) {
                 let i: Int = 0;
                 while (i < self.totalUsers && !recipientFound) {
                     let currentIndex: Int = (self.spilloverRecipientIndex + i) % self.totalUsers;
                     let potentialRecipientAddress: Address = self.userList.get(currentIndex)!!;
                     let potentialRecipient: User = self.users.get(potentialRecipientAddress)!!;
-
-                    if (potentialRecipient.level > level) {
+                    if (potentialRecipient.level >= level) {
                         let lastCycleOpt: Int? = self.userLastCycle.get(potentialRecipientAddress);
                         let lastCycle: Int = 0;
-                        if (lastCycleOpt != null) {
-                            lastCycle = lastCycleOpt!!;
-                        }
+                        if (lastCycleOpt != null) { lastCycle = lastCycleOpt!!; }
 
                         if (lastCycle < self.spilloverCycle) {
                             send(SendParameters{ to: potentialRecipientAddress, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover Reward".asComment() });
-
                             self.userLastCycle.set(potentialRecipientAddress, self.spilloverCycle);
                             self.spilloverRecipientIndex = (currentIndex + 1) % self.totalUsers;
                             recipientFound = true;
@@ -484,16 +628,14 @@ contract TonCrown with Deployable, OwnableTransferable {
 
             if (!recipientFound && self.totalUsers > 0) {
                 self.spilloverCycle += 1;
-
                 let i: Int = 0;
                 while (i < self.totalUsers && !recipientFound) {
                     let currentIndex: Int = (self.spilloverRecipientIndex + i) % self.totalUsers;
                     let potentialRecipientAddress: Address = self.userList.get(currentIndex)!!;
                     let potentialRecipient: User = self.users.get(potentialRecipientAddress)!!;
 
-                    if (potentialRecipient.level > level) {
+                    if (potentialRecipient.level >= level) {
                         send(SendParameters{ to: potentialRecipientAddress, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover Reward".asComment() });
-
                         self.userLastCycle.set(potentialRecipientAddress, self.spilloverCycle);
                         self.spilloverRecipientIndex = (currentIndex + 1) % self.totalUsers;
                         recipientFound = true;
@@ -505,222 +647,16 @@ contract TonCrown with Deployable, OwnableTransferable {
             if (!recipientFound) {
                 send(SendParameters{ to: self.creatorWallet3, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover to Creator (No Eligible Users)".asComment() });
             }
-
             unallocatedFunds -= spilloverShare;
         }
-
         if (unallocatedFunds > 0) {
             send(SendParameters{ to: self.creatorWallet3, value: unallocatedFunds, mode: SendIgnoreErrors });
         }
     }
 
-    receive(msg: CheckIn) {
-        self.requireNotPaused();
-        let sender: Address = sender();
-        let currentUser: User = self.requireUserExists(sender);
-        let currentTime: Int = now();
-
-        require(currentTime - currentUser.lastCheckIn >= self.SECONDS_PER_DAY, "Already checked in today");
-
-        if (currentUser.level == 1 && currentTime > currentUser.levelExpiration) {
-            currentUser.isActive = false;
-            currentUser.level = 0;
-            self.users.set(sender, currentUser);
-            self.reply("Level expired - please upgrade".asComment());
-            return;
-        }
-
-        require(currentUser.level > 0 && currentUser.isActive, "Must have active level to check in");
-
-        currentUser.lastCheckIn = currentTime;
-
-        let reward: Int = self.DAILY_CHECKIN_REWARD;
-        currentUser.pendingRewards = currentUser.pendingRewards + reward;
-        self.users.set(sender, currentUser);
-
-        self.reply("Check-in successful. You have pending rewards to claim.".asComment());
-    }
-
-    receive(msg: ClaimPendingRewards) {
-        self.requireNotPaused();
-        let sender: Address = sender();
-        let currentUser: User = self.requireUserExists(sender);
-
-        require(currentUser.pendingRewards > 0, "No pending rewards to claim");
-
-        let claimAmount: Int = currentUser.pendingRewards;
-        currentUser.pendingRewards = 0;
-        currentUser.totalEarned = currentUser.totalEarned + claimAmount;
-        self.users.set(sender, currentUser);
-
-        send(SendParameters{ to: sender, value: claimAmount, mode: SendIgnoreErrors, body: "Daily Check-in Reward Claim".asComment() });
-        self.totalDistributed = self.totalDistributed + claimAmount;
-
-        self.reply("Rewards claimed successfully.".asComment());
-    }
-
-    receive(msg: StakeTON) {
-        self.requireNotPaused();
-        let sender: Address = sender();
-        let user: User = self.getOrRegisterUser(sender, msg.referrerAddress);
-
-        require(user.vipClass > 0, "VIP status required for staking");
-        require(msg.duration >= self.MIN_STAKE_DURATION && msg.duration <= self.MAX_STAKE_DURATION, "Invalid staking duration");
-        require(self.tonPriceInUsdt > 0, "Price not available. Oracle may need to be updated.");
-
-        let stakeAmount: Int = msg.amount;
-        require(context().value >= stakeAmount + ton("0.1"), "Insufficient value attached for the stake amount");
-        
-        let stakeValueInUsd6: Int = stakeAmount * self.tonPriceInUsdt / ton("1");
-        let minStakeUsd6: Int = self.getMinStakeInUsd6Decimals(user.vipClass);
-        require(stakeValueInUsd6 >= minStakeUsd6, "Stake amount is below the minimum for your VIP level");
-
-        let stakeId: Int = user.stakeCounter;
-        let newStake: StakeInfo = StakeInfo{
-            stakeId: stakeId,
-            amount: stakeAmount,
-            startTime: now(),
-            duration: msg.duration * self.SECONDS_PER_DAY,
-            vipClass: user.vipClass,
-            autoRestake: msg.autoRestake,
-            lastClaim: now(),
-            totalClaimed: 0,
-            isActive: true,
-            stakedAsset: self.ASSET_TON
-        };
-
-        user.stakes.set(stakeId, newStake);
-        user.stakeCounter += 1;
-        self.users.set(sender, user);
-
-        self.totalStakedTon = self.totalStakedTon + stakeAmount;
-        self.activeStakes = self.activeStakes + 1;
-
-        send(SendParameters{ to: self.creatorWallet3, value: stakeAmount, mode: SendIgnoreErrors, body: "TON Staking Capital".asComment() });
-
-        self.reply("Staking successful".asComment());
-    }
-
-    receive(msg: JettonTransferNotification) {
-        self.requireNotPaused();
-        require(sender() == self.usdtJettonWalletAddress, "Notification from unknown jetton wallet");
-
-        let stakerAddress: Address = msg.sender;
-        let usdtReceived: Int = msg.amount;
-        let payloadSlice: Slice = msg.forwardPayload;
-        let op: Int = payloadSlice.loadUint(32);
-
-        if (op == self.OP_STAKE_USDT) {
-            let payload: StakeUsdtPayload = StakeUsdtPayload{
-                duration: payloadSlice.loadUint(32),
-                autoRestake: payloadSlice.loadBool(),
-                referrerAddress: payloadSlice.loadAddress()
-            };
-
-            let user: User = self.getOrRegisterUser(stakerAddress, payload.referrerAddress);
-            require(user.vipClass > 0, "VIP status required for staking");
-            require(payload.duration >= self.MIN_STAKE_DURATION && payload.duration <= self.MAX_STAKE_DURATION, "Invalid staking duration");
-
-            let minStakeUsd6: Int = self.getMinStakeInUsd6Decimals(user.vipClass);
-            require(usdtReceived >= minStakeUsd6, "Stake amount is below the minimum for your VIP level");
-            
-            let stakeId: Int = user.stakeCounter;
-            let newStake: StakeInfo = StakeInfo{
-                stakeId: stakeId,
-                amount: usdtReceived,
-                startTime: now(),
-                duration: payload.duration * self.SECONDS_PER_DAY,
-                vipClass: user.vipClass,
-                autoRestake: payload.autoRestake,
-                lastClaim: now(),
-                totalClaimed: 0,
-                isActive: true,
-                stakedAsset: self.ASSET_USDT
-            };
-
-            user.stakes.set(stakeId, newStake);
-            user.stakeCounter += 1;
-            self.users.set(stakerAddress, user);
-            self.totalStakedUsdt = self.totalStakedUsdt + usdtReceived;
-            self.activeStakes = self.activeStakes + 1;
-
-            send(SendParameters{
-                to: self.usdtJettonWalletAddress, value: ton("0.1"), mode: SendIgnoreErrors,
-                body: JettonTransfer{
-                    queryId: 0, amount: usdtReceived, destination: self.creatorWallet3,
-                    response_destination: self.owner, custom_payload: null, forward_ton_amount: ton("0.05"),
-                    forward_payload: "USDT Staking Capital".asComment().asSlice()
-                }.toCell()
-            });
-
-        } else if (op == self.OP_STAKE_TON_WITH_USDT) {
-            require(self.tonPriceInUsdt > 0, "Price not available. Oracle may need to be updated.");
-            let tonAmountToStake: Int = payloadSlice.loadCoins();
-            let duration: Int = payloadSlice.loadUint(32);
-            let autoRestake: Bool = payloadSlice.loadBool();
-            let referrerAddress: Address? = payloadSlice.loadAddress();
-
-            let user: User = self.getOrRegisterUser(stakerAddress, referrerAddress);
-            require(user.vipClass > 0, "VIP status required for staking");
-            require(duration >= self.MIN_STAKE_DURATION && duration <= self.MAX_STAKE_DURATION, "Invalid staking duration");
-            
-            let stakeValueInUsd6: Int = tonAmountToStake * self.tonPriceInUsdt / ton("1");
-            let minStakeUsd6: Int = self.getMinStakeInUsd6Decimals(user.vipClass);
-            require(stakeValueInUsd6 >= minStakeUsd6, "Stake amount is below the minimum for your VIP level");
-
-            let requiredUsdt: Int = stakeValueInUsd6;
-            require(usdtReceived >= requiredUsdt, "Insufficient USDT payment for the specified TON amount");
-
-            let stakeId: Int = user.stakeCounter;
-            let newStake: StakeInfo = StakeInfo{
-                stakeId: stakeId,
-                amount: tonAmountToStake,
-                startTime: now(),
-                duration: duration * self.SECONDS_PER_DAY,
-                vipClass: user.vipClass,
-                autoRestake: autoRestake,
-                lastClaim: now(),
-                totalClaimed: 0,
-                isActive: true,
-                stakedAsset: self.ASSET_TON
-            };
-
-            user.stakes.set(stakeId, newStake);
-            user.stakeCounter += 1;
-            self.users.set(stakerAddress, user);
-            self.totalStakedTon = self.totalStakedTon + tonAmountToStake;
-            self.activeStakes = self.activeStakes + 1;
-
-            send(SendParameters{
-                to: self.usdtJettonWalletAddress, value: ton("0.1"), mode: SendIgnoreErrors,
-                body: JettonTransfer{
-                    queryId: 0, amount: requiredUsdt, destination: self.creatorWallet3,
-                    response_destination: self.owner, custom_payload: null, forward_ton_amount: ton("0.05"),
-                    forward_payload: "USDT Staking Capital (for TON)".asComment().asSlice()
-                }.toCell()
-            });
-
-            let excessUsdt: Int = usdtReceived - requiredUsdt;
-            if (excessUsdt > 0) {
-                 send(SendParameters{
-                    to: self.usdtJettonWalletAddress, value: ton("0.1"), mode: SendIgnoreErrors,
-                    body: JettonTransfer{
-                        queryId: 0, amount: excessUsdt, destination: self.creatorWallet4,
-                        response_destination: self.owner, custom_payload: null, forward_ton_amount: ton("0.05"),
-                        forward_payload: "Excess USDT from stake".asComment().asSlice()
-                    }.toCell()
-                });
-            }
-        } else {
-            require(false, "Unknown operation code in forward payload");
-        }
-    }
-
-    receive(msg: ClaimStakingRewards) {
-        self.requireNotPaused();
-        let sender: Address = sender();
-        let user: User = self.requireUserExists(sender);
-        let stake: StakeInfo? = user.stakes.get(msg.stakeId);
+    fun processRewardPayout(userAddress: Address, stakeId: Int) {
+        let user: User = self.requireUserExists(userAddress);
+        let stake: StakeInfo? = user.stakes.get(stakeId);
         require(stake != null, "No such stake found");
 
         let currentStake: StakeInfo = stake!!;
@@ -734,80 +670,48 @@ contract TonCrown with Deployable, OwnableTransferable {
         let dailyReward: Int = currentStake.amount * vipConfig.stakingRoi / 10000;
         let totalReward: Int = dailyReward * daysSinceLastClaim;
 
+        // SUBTRACT GAS FEE FROM REWARD
+        let netReward: Int = totalReward - self.DISTRIBUTION_GAS_FEE;
+
+        // ONLY SEND IF POSITIVE REWARD AFTER GAS FEE
+        if (netReward > 0) {
+            send(SendParameters{ to: userAddress, value: netReward, mode: SendIgnoreErrors, body: "Staking Rewards".asComment() });
+        }
+        
         if (currentTime >= currentStake.startTime + currentStake.duration) {
             if (currentStake.autoRestake) {
                 currentStake.startTime = currentTime;
                 currentStake.lastClaim = currentTime;
             } else {
                 if (currentStake.stakedAsset == self.ASSET_TON) {
-                    send(SendParameters{ to: sender, value: currentStake.amount, mode: SendIgnoreErrors, body: "Staking Capital Refund".asComment() });
-                } else {
+                    send(SendParameters{ to: userAddress, value: currentStake.amount, mode: SendIgnoreErrors, body: "Staking Capital Refund".asComment() });
+                    self.totalStakedTon -= currentStake.amount;
+                } else { 
                     send(SendParameters{
                         to: self.usdtJettonWalletAddress, value: ton("0.1"), mode: SendIgnoreErrors,
                         body: JettonTransfer{
-                            queryId: 0, amount: currentStake.amount, destination: sender,
-                            response_destination: sender, custom_payload: null, forward_ton_amount: ton("0.05"),
+                            queryId: 0, amount: currentStake.amount, destination: userAddress,
+                            response_destination: userAddress, custom_payload: null, forward_ton_amount: ton("0.005"),
                             forward_payload: "Staking Capital Refund".asComment().asSlice()
                         }.toCell()
                     });
+                    self.totalStakedUsdt -= currentStake.amount;
                 }
                 currentStake.isActive = false;
-                if (currentStake.stakedAsset == self.ASSET_TON) {
-                    self.totalStakedTon = self.totalStakedTon - currentStake.amount;
-                } else {
-                    self.totalStakedUsdt = self.totalStakedUsdt - currentStake.amount;
-                }
-                self.activeStakes = self.activeStakes - 1;
+                self.activeStakes -= 1;
             }
         } else {
             currentStake.lastClaim = currentTime;
         }
 
-        currentStake.totalClaimed = currentStake.totalClaimed + totalReward;
-        user.stakes.set(msg.stakeId, currentStake);
-        self.users.set(sender, user);
-
-        send(SendParameters{ to: sender, value: totalReward, mode: SendIgnoreErrors, body: "Staking Rewards".asComment() });
-        self.totalDistributed = self.totalDistributed + totalReward;
-    }
-    
-    receive(msg: SignedPriceData) {
-        // Use the correct built-in .hash() method and checkSignature() function for verification.
-        require(checkSignature(msg.dataCell.hash(), msg.signature, self.oraclePubKey), "Invalid oracle signature");
-
-        let ds: Slice = msg.dataCell.beginParse();
-        let timestamp: Int = ds.loadUint(64);
-        let price: Int = ds.loadCoins();
-
-        require(now() - timestamp < 900, "Oracle data is stale");
-        self.tonPriceInUsdt = price / 1000;
+        currentStake.totalClaimed += totalReward;
+        user.stakes.set(stakeId, currentStake);
+        self.users.set(userAddress, user);
+        self.totalDistributed += totalReward;
     }
 
-    receive(msg: UpdateAutoRestake) {
-        self.requireNotPaused();
-        let sender: Address = sender();
-        let user: User = self.requireUserExists(sender);
-        let stake: StakeInfo? = user.stakes.get(msg.stakeId);
-        require(stake != null && stake!!.isActive, "No active stake");
 
-        let mutableStake: StakeInfo = stake!!;
-        mutableStake.autoRestake = msg.autoRestake;
-        user.stakes.set(msg.stakeId, mutableStake);
-        self.users.set(sender, user);
-
-        self.reply("Auto-restake preference updated".asComment());
-    }
-
-    receive(msg: SetUsdtJettonWallet) {
-        self.requireOwner();
-        self.usdtJettonWalletAddress = msg.wallet;
-    }
-
-    receive(msg: UpdateLevelCost) {
-        self.requireOwner();
-        self.levelCosts.set(msg.level, msg.cost);
-    }
-
+    //GETTER FUNCTIONS
     get fun getUserInfo(user: Address): User? {
         return self.users.get(user);
     }
@@ -822,7 +726,7 @@ contract TonCrown with Deployable, OwnableTransferable {
         };
     }
 
-    get fun getTonPrice(): Int {
-        return self.tonPriceInUsdt;
+    get fun getUserAddressByIndex(index: Int): Address? {
+        return self.userList.get(index);
     }
 }
