@@ -1,0 +1,159 @@
+Detailed Changes
+
+1. Staking Mechanics
+
+Multiple Stakes per User:
+v1: Supports one active stake per user, stored in a global stakes: map<Address, StakeInfo>.
+v2: Allows multiple stakes per user. User struct now includes stakeCounter: Int as uint16 and stakes: map<Int, StakeInfo>. StakeInfo adds stakeId: Int as uint16. Messages like ClaimStakingRewards and UpdateAutoRestake now require a stakeId parameter. Staking functions increment stakeCounter and store stakes in the user's map.
+
+Impact: Frontend should support displaying and managing multiple stakes per user, including stake IDs for claiming rewards or updating auto-restake settings.
+
+Minimum Stake Amounts:
+v1: Fixed minimums of 1 TON or 1 USDT (6 decimals).
+v2: Introduces VIP-class-based minimums via new functions:
+
+getMinStakeTon: To be set on frontend i.e Ton Amount to be staked should be equivalent to usdt minimums
+getMinStakeInUsd6Decimals: VIP1: 10 USDT, VIP2: 50 USDT, VIP3+: 300 USDT.
+
+Impact: Frontend must update staking forms to enforce dynamic minimums based on user VIP class.
+
+StakeTON Message:
+
+v1: StakeTON includes amount field; requires context().value >= amount + ton("0.1").
+v2: Removes amount from StakeTON; stake amount is context().value - ton("0.1").
+
+Impact: Frontend should adjust StakeTON transaction construction to omit amount and ensure sufficient TON is sent.
+
+Staked Asset Handling:
+
+v1: Retains stakes in the contract (TON in balance, USDT in usdtJettonWalletAddress).
+v2: Forwards full staked amount (TON or USDT) to creatorWallet3 immediately upon staking via SendParameters (TON) or JettonTransfer (USDT).
+
+Impact: Frontend should inform users that staked assets are sent to a creator wallet, not held in the contract(optional). Update transaction confirmations accordingly.
+
+USDT Staking Payload:
+
+v1: Uses StakePayload struct with autoRestake: Bit (parsed via loadBit()).
+v2: Renames to StakeUsdtPayload, uses autoRestake: Bool (parsed via loadBool()).
+
+Impact: Update payload serialization in frontend to use boolean encoding for USDT staking.
+
+Unstaking:
+
+v1: Separate UnstakeTON and UnstakeUSDT messages allow early unstaking without duration checks or rewards.
+v2: Removes these messages. Unstaking occurs only in processRewardPayout when stake duration ends and autoRestake is false.
+
+Impact: Remove unstake buttons/options from frontend. Unstaking is now automatic at stake maturity if not auto-restaked.
+
+2. Reward Payouts
+
+Asset-Specific Payouts:
+v1: All rewards paid in TON, regardless of staked asset.
+v2: Rewards match the staked asset (stakedAsset). TON rewards deduct DISTRIBUTION_GAS_FEE = ton("0.005"). USDT rewards use JettonTransfer with full amount.
+
+Impact: Frontend must display rewards in TON or USDT based on stake type. Update wallet balance displays to handle both assets.
+
+Claim Process:
+v1: ClaimStakingRewards handles single stake per user inline.
+v2: Uses processRewardPayout(userAddress, stakeId) for multiple stakes. Requires stakeId in ClaimStakingRewards. Auto-distribution from distribution service and manual claims implemented.
+
+
+Impact: Frontend must fetch and prompt users to select a stakeId when claiming rewards.
+
+Distributor Integration:
+
+v1: No distributor functionality.
+v2: Adds DistributeDailyRewards { user: Address; stakeId: Int as uint16; } message, callable only from distributorAddress (set via SetDistributor). Allows external reward triggering.
+
+Impact: Frontend may need to hide distributor-triggered claims from users. Seperate backend service has been created to for distribution service.
+
+3. Check-In Rewards
+
+v1: Adds DAILY_CHECKIN_REWARD to User.pendingRewards. Requires ClaimPendingRewards message to claim. Rewards forfeit if not claimed within 24 hours of check-in.
+v2: Sends DAILY_CHECKIN_REWARD directly to user on CheckIn, updates totalEarned and totalDistributed. Removes pendingRewards and ClaimPendingRewards.
+
+Impact: Remove pending rewards UI and claim button. Update check-in flow to show immediate reward transfer to user wallet.
+
+4. Referral and Fund Distribution
+Spillover Eligibility:
+
+v1: Spillover rewards require potentialRecipient.level > level.
+v2: Uses potentialRecipient.level >= level i.e Only users of equal or higher level of a newly purchased level are eligible for spillover rewards. If none, it falls back to creator wallet 3.
+
+Impact: Update referral reward descriptions to reflect broader eligibility.
+
+Fund Distribution Comments:
+v1: Minimal or no body comments in send calls.
+v2: Adds descriptive comments (e.g., "Creator Share 1", "Spillover Reward (New Cycle)").
+
+Impact: Update transaction logs or user notifications to display these detailed comments.
+
+Unallocated Funds:
+v2: Explicitly calculates and sends unallocatedFunds to creatorWallet3.
+
+Impact: Ensure frontend reflects that unallocated funds go to a creator wallet.
+
+5. Owner/Admin Features
+
+Added in v2:
+
+SetDistributor { address: Address; } and distributorAddress state variable (initialized to owner).
+
+Impact: Add admin UI for setting distributor address if needed i.e if a user's wallet is the same as the creator or contract wallet address, display panel to set distributor wallet
+
+Removed in v2:
+SetCreatorWallet, UpdateVipConfig, EmergencyPause, ClaimPendingRewards, UnstakeTON, UnstakeUSDT.
+
+Impact: Remove these admin controls and user-facing unstake/claim options from frontend.
+
+Retained:
+SetUsdtJettonWallet.
+
+Impact: Ensure admin UI supports USDT wallet updates.
+
+6. Constants and Initialization
+
+New Constant in v2: DISTRIBUTION_GAS_FEE = ton("0.005") for TON reward deductions.
+
+Creator Wallets: Updated addresses in v2 (e.g., creatorWallet1: "0QDz4oTAnjswERGHK1BNL9hlxcMn-nVLvvALLRCeYiwyZcTO"). Both versions have unused creatorWallet4.
+
+Impact: Update frontend configuration with new creator wallet addresses.
+
+7. Getters and Stats
+
+Added in v2: getUserAddressByIndex(index: Int): Address?, getUsdtJettonWalletAddress(): Address.
+
+Removed in v2: getStakeInfo(user: Address): StakeInfo? (stakes now accessed via User.stakes in getUserInfo).
+
+Impact: Update API calls to use getUserInfo for stake data and add support for new getters if needed.
+
+8. Minor Refinements
+
+User Struct: v2 removes pendingRewards, adds stakeCounter and stakes map.
+
+Jetton Messages: v2 uses loadBool(); v1 uses loadBit(). v2 adds forward_ton_amount: ton("0.005") in JettonTransfer.
+Gas/Fees: v2 standardizes ton("0.1") for Jetton sends, deducts from TON rewards.
+Error Messages: Minor tweaks (e.g., "No active stake" in v2).
+
+Impact: Update frontend error handling and payload serialization. Adjust gas fee displays.
+
+Recommendations for Frontend
+
+UI Updates:
+Add support for multiple stakes (list stakes with IDs, allow selection for claims/auto-restake).
+Display dynamic minimum stake amounts based on VIP class.
+Show rewards in TON or USDT based on stake type.
+Remove unstake and pending rewards claim buttons.
+Update check-in to show immediate reward transfers.
+
+Transaction Handling:
+Update USDT staking payload for boolean encoding.
+Display detailed transaction comments (e.g., "Spillover Reward").
+
+User Communication:
+Clarify rewards are paid in the staked asset type.
+Update referral reward eligibility descriptions.
+
+Conclusion
+
+The v2 contract enhances flexibility with multiple stakes, aligns rewards with staked assets, and introduces distributor-driven payouts, but removes early unstaking and some admin controls. Frontend updates should focus on multi-stake support, asset-specific displays, and simplified reward/claim flows. Coordinate with the product manager to ensure user-facing changes are clearly communicated.

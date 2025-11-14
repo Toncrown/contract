@@ -120,6 +120,11 @@ message SetDistributor {
     address: Address;
 }
 
+message OwnerDeposit {}
+
+message OwnerWithdraw {
+    amount: Int as coins;
+}
 
 
 //MONTRACT INITIALIZATION: TONCROWN
@@ -163,9 +168,9 @@ contract TonCrown with Deployable, OwnableTransferable {
 
     init(owner: Address) {
         self.owner = owner;
-        self.creatorWallet1 = address("0QAzL_NTGF3Z1mgNIV6jf1qxEdXgxd67Zf6i7ZDm70Xqa7Ts");
+        self.creatorWallet1 = address("0QDz4oTAnjswERGHK1BNL9hlxcMn-nVLvvALLRCeYiwyZcTO");
         self.creatorWallet2 = address("0QAtYOHIpbdZL0_04aXSg5aZLT0LaQNOrl858DlUoKyqcMcm");
-        self.creatorWallet3 = address("0QCtNZf0MCqmy558C2zgtzK7i69gg0ttOBWmZ-88ScJp4_Cz");
+        self.creatorWallet3 = address("0QBLDTtYt33GAzKXLdLeDlTTTMKsIz7wAYpkq1eXq3E89Qzc");
         self.creatorWallet4 = address("0QDMixPIWRosGle-BviB1ByuQbhOS2DLYzL6GWjg6NwvbdSR");
 
         self.usdtJettonWalletAddress = owner; 
@@ -176,7 +181,7 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.totalStakedUsdt = 0;
         self.totalDistributed = 0;
         self.activeStakes = 0;
-        self.isPaused = false;
+        self.isPaused = false; 
 
         self.spilloverRecipientIndex = 0;
         self.spilloverCycle = 1;
@@ -199,8 +204,16 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.vipConfigs.set(4, VipConfig{ dailyRoi: 250, minLevel: 10, maxLevel: 10, stakingRoi: 250 });
     }
 
-
     //RECIEVER FUNCTIONS
+
+    // CHANGE START: Moved generic receive() to be the FIRST receive function
+    receive() {
+        // This function is intentionally left empty.
+        // Its purpose is to accept incoming TON transfers without a specific message body.
+        // This allows anyone to send TON to the contract to fund its balance.
+    }
+    // CHANGE END
+
     receive(msg: UpgradeLevel) {
         self.requireNotPaused();
 
@@ -390,6 +403,22 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.requireOwner();
         self.distributorAddress = msg.address;
     }
+    
+    receive(msg: OwnerDeposit) {
+        self.requireOwner();
+        self.reply("Deposit successful".asComment());
+    }
+
+    receive(msg: OwnerWithdraw) {
+        self.requireOwner();
+        require(myBalance() > msg.amount, "Insufficient contract balance");
+        send(SendParameters{
+            to: self.owner,
+            value: msg.amount,
+            mode: SendPayGasSeparately,
+            body: "Owner Withdrawal".asComment()
+        });
+    }
 
     fun requireNotPaused() {
         require(!self.isPaused, "Contract is paused");
@@ -571,17 +600,17 @@ contract TonCrown with Deployable, OwnableTransferable {
         let spilloverShare: Int = amount * 20 / 100;
         let unallocatedFunds: Int = amount - creator1Share - creator2Share - creator3Share;
 
-        send(SendParameters{ to: self.creatorWallet1, value: creator1Share, mode: SendIgnoreErrors });
-        send(SendParameters{ to: self.creatorWallet2, value: creator2Share, mode: SendIgnoreErrors });
-        send(SendParameters{ to: self.creatorWallet3, value: creator3Share, mode: SendIgnoreErrors });
+        send(SendParameters{ to: self.creatorWallet1, value: creator1Share, mode: SendIgnoreErrors, body: "Creator Share 1".asComment() });
+        send(SendParameters{ to: self.creatorWallet2, value: creator2Share, mode: SendIgnoreErrors, body: "Creator Share 2".asComment() });
+        send(SendParameters{ to: self.creatorWallet3, value: creator3Share, mode: SendIgnoreErrors, body: "Creator Share 3".asComment() });
 
         if (level == 1) {
             if (originalReferrer != null && actualReferrer != null && originalReferrer != actualReferrer) {
                 let splitShare: Int = referralUplineShare / 2;
-                send(SendParameters{ to: originalReferrer!!, value: splitShare, mode: SendIgnoreErrors });
-                send(SendParameters{ to: actualReferrer!!, value: splitShare, mode: SendIgnoreErrors });
+                send(SendParameters{ to: originalReferrer!!, value: splitShare, mode: SendIgnoreErrors, body: "Spillover Referral Commission".asComment() });
+                send(SendParameters{ to: actualReferrer!!, value: splitShare, mode: SendIgnoreErrors, body: "Direct Referral Commission".asComment() });
             } else if (actualReferrer != null) {
-                send(SendParameters{ to: actualReferrer!!, value: referralUplineShare, mode: SendIgnoreErrors });
+                send(SendParameters{ to: actualReferrer!!, value: referralUplineShare, mode: SendIgnoreErrors, body: "Direct Referral Commission".asComment() });
             }
             unallocatedFunds -= referralUplineShare;
         } else {
@@ -589,15 +618,15 @@ contract TonCrown with Deployable, OwnableTransferable {
             if (isSpillover) {
                 let splitShare: Int = referralUplineShare / 2;
                 let originalReferrerUser: User = self.users.get(originalReferrer!!)!!;
-                if (originalReferrerUser.level >= level) { send(SendParameters{ to: originalReferrer!!, value: splitShare, mode: SendIgnoreErrors }); }
-                else { send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors }); }
+                if (originalReferrerUser.level >= level) { send(SendParameters{ to: originalReferrer!!, value: splitShare, mode: SendIgnoreErrors, body: "Spillover Uplvl Commission".asComment() }); }
+                else { send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors, body: "Missed Spillover Uplvl Comm".asComment() }); }
                 let actualReferrerUser: User = self.users.get(actualReferrer!!)!!;
-                if (actualReferrerUser.level >= level) { send(SendParameters{ to: actualReferrer!!, value: splitShare, mode: SendIgnoreErrors }); }
-                else { send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors }); }
+                if (actualReferrerUser.level >= level) { send(SendParameters{ to: actualReferrer!!, value: splitShare, mode: SendIgnoreErrors, body: "Direct Uplvl Commission".asComment() }); }
+                else { send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors, body: "Missed Direct Uplvl Comm".asComment() }); }
 
             } else {
-                if (actualReferrer != null && self.users.get(actualReferrer!!)!!.level >= level) { send(SendParameters{ to: actualReferrer!!, value: referralUplineShare, mode: SendIgnoreErrors }); }
-                else { send(SendParameters{ to: self.creatorWallet3, value: referralUplineShare, mode: SendIgnoreErrors }); }
+                if (actualReferrer != null && self.users.get(actualReferrer!!)!!.level >= level) { send(SendParameters{ to: actualReferrer!!, value: referralUplineShare, mode: SendIgnoreErrors, body: "Uplvl Commission".asComment() }); }
+                else { send(SendParameters{ to: self.creatorWallet3, value: referralUplineShare, mode: SendIgnoreErrors, body: "Missed Uplvl Commission".asComment() }); }
             }
             unallocatedFunds -= referralUplineShare;
         }
@@ -635,7 +664,7 @@ contract TonCrown with Deployable, OwnableTransferable {
                     let potentialRecipient: User = self.users.get(potentialRecipientAddress)!!;
 
                     if (potentialRecipient.level >= level) {
-                        send(SendParameters{ to: potentialRecipientAddress, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover Reward".asComment() });
+                        send(SendParameters{ to: potentialRecipientAddress, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover Reward (New Cycle)".asComment() });
                         self.userLastCycle.set(potentialRecipientAddress, self.spilloverCycle);
                         self.spilloverRecipientIndex = (currentIndex + 1) % self.totalUsers;
                         recipientFound = true;
@@ -645,12 +674,12 @@ contract TonCrown with Deployable, OwnableTransferable {
             }
 
             if (!recipientFound) {
-                send(SendParameters{ to: self.creatorWallet3, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover to Creator (No Eligible Users)".asComment() });
+                send(SendParameters{ to: self.creatorWallet3, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover to Creator Wallet".asComment() });
             }
             unallocatedFunds -= spilloverShare;
         }
         if (unallocatedFunds > 0) {
-            send(SendParameters{ to: self.creatorWallet3, value: unallocatedFunds, mode: SendIgnoreErrors });
+            send(SendParameters{ to: self.creatorWallet3, value: unallocatedFunds, mode: SendIgnoreErrors, body: "Unallocated Funds".asComment() });
         }
     }
 
@@ -670,12 +699,22 @@ contract TonCrown with Deployable, OwnableTransferable {
         let dailyReward: Int = currentStake.amount * vipConfig.stakingRoi / 10000;
         let totalReward: Int = dailyReward * daysSinceLastClaim;
 
-        // SUBTRACT GAS FEE FROM REWARD
-        let netReward: Int = totalReward - self.DISTRIBUTION_GAS_FEE;
-
-        // ONLY SEND IF POSITIVE REWARD AFTER GAS FEE
-        if (netReward > 0) {
-            send(SendParameters{ to: userAddress, value: netReward, mode: SendIgnoreErrors, body: "Staking Rewards".asComment() });
+        if (currentStake.stakedAsset == self.ASSET_TON) {
+            let netReward: Int = totalReward - self.DISTRIBUTION_GAS_FEE;
+            if (netReward > 0) {
+                send(SendParameters{ to: userAddress, value: netReward, mode: SendIgnoreErrors, body: "TON Staking Rewards".asComment() });
+            }
+        } else {
+            if (totalReward > 0) {
+                send(SendParameters{
+                    to: self.usdtJettonWalletAddress, value: ton("0.1"), mode: SendIgnoreErrors,
+                    body: JettonTransfer{
+                        queryId: 0, amount: totalReward, destination: userAddress,
+                        response_destination: userAddress, custom_payload: null, forward_ton_amount: ton("0.005"),
+                        forward_payload: "USDT Staking Rewards".asComment().asSlice()
+                    }.toCell()
+                });
+            }
         }
         
         if (currentTime >= currentStake.startTime + currentStake.duration) {
@@ -684,7 +723,7 @@ contract TonCrown with Deployable, OwnableTransferable {
                 currentStake.lastClaim = currentTime;
             } else {
                 if (currentStake.stakedAsset == self.ASSET_TON) {
-                    send(SendParameters{ to: userAddress, value: currentStake.amount, mode: SendIgnoreErrors, body: "Staking Capital Refund".asComment() });
+                    send(SendParameters{ to: userAddress, value: currentStake.amount, mode: SendIgnoreErrors, body: "TON Stake Principal Refund".asComment() });
                     self.totalStakedTon -= currentStake.amount;
                 } else { 
                     send(SendParameters{
@@ -692,7 +731,7 @@ contract TonCrown with Deployable, OwnableTransferable {
                         body: JettonTransfer{
                             queryId: 0, amount: currentStake.amount, destination: userAddress,
                             response_destination: userAddress, custom_payload: null, forward_ton_amount: ton("0.005"),
-                            forward_payload: "Staking Capital Refund".asComment().asSlice()
+                            forward_payload: "USDT Stake Principal Refund".asComment().asSlice()
                         }.toCell()
                     });
                     self.totalStakedUsdt -= currentStake.amount;
@@ -729,4 +768,8 @@ contract TonCrown with Deployable, OwnableTransferable {
     get fun getUserAddressByIndex(index: Int): Address? {
         return self.userList.get(index);
     }
+
+    get fun getUsdtJettonWalletAddress(): Address {
+    return self.usdtJettonWalletAddress;
 }
+} 

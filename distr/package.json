@@ -1,0 +1,32 @@
+{
+  "name": "toncrown-distribution-service",
+  "version": "1.0.0",
+  "description": "Automated staking rewards distribution service for TonCrown",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@ton/core": "^0.61.0",
+    "@ton/crypto": "^3.2.0",
+    "@ton/ton": "^15.0.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "node-cron": "^3.0.3",
+    "nodemon": "^3.1.10",
+    "pm2": "^6.0.13",
+    "sqlite3": "^5.1.6",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.5",
+    "@types/node": "^20.8.0",
+    "@types/node-cron": "^3.0.11",
+    "jest": "^29.7.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}
