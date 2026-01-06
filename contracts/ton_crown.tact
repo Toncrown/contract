@@ -16,6 +16,30 @@ struct StakeInfo {
     stakedAsset: Int as uint8;
 }
 
+// NEW STRUCT for detailed stake information getter
+struct StakeDetails {
+    stakeId: Int as uint16;
+    amount: Int as coins;
+    startTime: Int as uint32;
+    duration: Int as uint32;
+    vipClass: Int as uint8;
+    autoRestake: Bool;
+    lastClaim: Int as uint32;
+    totalClaimed: Int as coins;
+    isActive: Bool;
+    stakedAsset: Int as uint8;
+    pendingReward: Int as coins; // Calculated pending reward
+}
+
+// NEW STRUCT for user referral information getter
+struct UserReferralInfo {
+    referrer: Address?;
+    directReferrals: Int as uint16;
+    totalReferrals: Int as uint32;
+    downlines: map<Int, Address>;
+}
+
+
 struct User {
     referrer: Address?;
     level: Int as uint8;
@@ -206,13 +230,9 @@ contract TonCrown with Deployable, OwnableTransferable {
 
     //RECIEVER FUNCTIONS
 
-    // CHANGE START: Moved generic receive() to be the FIRST receive function
     receive() {
         // This function is intentionally left empty.
-        // Its purpose is to accept incoming TON transfers without a specific message body.
-        // This allows anyone to send TON to the contract to fund its balance.
     }
-    // CHANGE END
 
     receive(msg: UpgradeLevel) {
         self.requireNotPaused();
@@ -515,12 +535,15 @@ contract TonCrown with Deployable, OwnableTransferable {
     fun findAndAssignSpillover(originalReferrer: Address, newUser: Address) {
         let originalReferrerUser: User = self.users.get(originalReferrer)!!;
         let numDirectDownlines: Int = originalReferrerUser.directReferrals;
+        
+        // 1. Check immediate 6 downlines first (Round Robin)
         if (numDirectDownlines > 0) {
             let i: Int = 0;
             while (i < numDirectDownlines) {
                 let downlineNum: Int = (originalReferrerUser.spilloverIndex + i) % numDirectDownlines + 1;
                 let downlineAddress: Address = originalReferrerUser.downlines.get(downlineNum)!!;
                 let downlineUser: User = self.users.get(downlineAddress)!!;
+                
                 if (downlineUser.directReferrals < self.MAX_DIRECT_REFERRALS) {
                     downlineUser.directReferrals += 1;
                     downlineUser.totalReferrals += 1;
@@ -531,7 +554,9 @@ contract TonCrown with Deployable, OwnableTransferable {
                     newUserStruct.referrer = downlineAddress;
                     self.users.set(newUser, newUserStruct);
 
+                    // FIX: Increment both counters for the original referrer
                     originalReferrerUser.otherReferrals += 1;
+                    originalReferrerUser.totalReferrals += 1; 
                     originalReferrerUser.spilloverIndex = downlineNum;
                     self.users.set(originalReferrer, originalReferrerUser);
                     return;
@@ -539,25 +564,27 @@ contract TonCrown with Deployable, OwnableTransferable {
                 i += 1;
             }
         }
+
+        // 2. BFS Search for deeper levels
         let queue: map<Int, Address> = emptyMap();
         let visited: map<Address, Bool> = emptyMap();
         let queueHead: Int = 0;
         let queueTail: Int = 0;
 
-        let i: Int = 1;
-        while (i <= originalReferrerUser.directReferrals) {
-            let downlineAddress: Address = originalReferrerUser.downlines.get(i)!!;
-            queue.set(queueTail, downlineAddress);
-            visited.set(downlineAddress, true);
+        let k: Int = 1;
+        while (k <= originalReferrerUser.directReferrals) {
+            let addr: Address = originalReferrerUser.downlines.get(k)!!;
+            queue.set(queueTail, addr);
+            visited.set(addr, true);
             queueTail += 1;
-            i += 1;
+            k += 1;
         }
 
         while (queueHead < queueTail) {
             let currentAddress: Address = queue.get(queueHead)!!;
             queueHead += 1;
-
             let currentUser: User = self.users.get(currentAddress)!!;
+
             if (currentUser.directReferrals < self.MAX_DIRECT_REFERRALS) {
                 currentUser.directReferrals += 1;
                 currentUser.totalReferrals += 1;
@@ -568,22 +595,26 @@ contract TonCrown with Deployable, OwnableTransferable {
                 newUserStruct.referrer = currentAddress;
                 self.users.set(newUser, newUserStruct);
 
+                // FIX: Increment both counters for original referrer
                 originalReferrerUser.otherReferrals += 1;
+                originalReferrerUser.totalReferrals += 1;
                 self.users.set(originalReferrer, originalReferrerUser);
                 return;
             }
+
             let j: Int = 1;
             while (j <= currentUser.directReferrals) {
-                let nextDownlineAddress: Address = currentUser.downlines.get(j)!!;
-                if (visited.get(nextDownlineAddress) == null) {
-                    visited.set(nextDownlineAddress, true);
-                    queue.set(queueTail, nextDownlineAddress);
+                let nextAddr: Address = currentUser.downlines.get(j)!!;
+                if (visited.get(nextAddr) == null) {
+                    visited.set(nextAddr, true);
+                    queue.set(queueTail, nextAddr);
                     queueTail += 1;
                 }
                 j += 1;
             }
         }
 
+        // Fallback: If no slot found in tree
         let newUserStruct: User = self.users.get(newUser)!!;
         newUserStruct.referrer = self.creatorWallet3;
         self.users.set(newUser, newUserStruct);
@@ -593,70 +624,93 @@ contract TonCrown with Deployable, OwnableTransferable {
         let user: User = self.users.get(payer)!!;
         let actualReferrer: Address? = user.referrer;
 
+        // Calculate Shares based on Level
         let creator1Share: Int = (level == 1) ? amount * 10 / 100 : amount * 20 / 100;
         let creator2Share: Int = (level == 1) ? amount * 10 / 100 : amount * 20 / 100;
         let creator3Share: Int = amount * 10 / 100;
         let referralUplineShare: Int = (level == 1) ? amount * 50 / 100 : amount * 30 / 100;
         let spilloverShare: Int = amount * 20 / 100;
-        let unallocatedFunds: Int = amount - creator1Share - creator2Share - creator3Share;
+        
+        // Tracking variable to ensure every nano-TON is accounted for
+        let unallocatedFunds: Int = amount;
 
+        // Distribute Creator Shares
         send(SendParameters{ to: self.creatorWallet1, value: creator1Share, mode: SendIgnoreErrors, body: "Creator Share 1".asComment() });
         send(SendParameters{ to: self.creatorWallet2, value: creator2Share, mode: SendIgnoreErrors, body: "Creator Share 2".asComment() });
         send(SendParameters{ to: self.creatorWallet3, value: creator3Share, mode: SendIgnoreErrors, body: "Creator Share 3".asComment() });
+        unallocatedFunds = unallocatedFunds - creator1Share - creator2Share - creator3Share;
 
-        if (level == 1) {
-            if (originalReferrer != null && actualReferrer != null && originalReferrer != actualReferrer) {
-                let splitShare: Int = referralUplineShare / 2;
-                send(SendParameters{ to: originalReferrer!!, value: splitShare, mode: SendIgnoreErrors, body: "Spillover Referral Commission".asComment() });
-                send(SendParameters{ to: actualReferrer!!, value: splitShare, mode: SendIgnoreErrors, body: "Direct Referral Commission".asComment() });
-            } else if (actualReferrer != null) {
-                send(SendParameters{ to: actualReferrer!!, value: referralUplineShare, mode: SendIgnoreErrors, body: "Direct Referral Commission".asComment() });
-            }
-            unallocatedFunds -= referralUplineShare;
-        } else {
-            let isSpillover: Bool = originalReferrer != null && actualReferrer != null && originalReferrer != actualReferrer;
-            if (isSpillover) {
-                let splitShare: Int = referralUplineShare / 2;
-                let originalReferrerUser: User = self.users.get(originalReferrer!!)!!;
-                if (originalReferrerUser.level >= level) { send(SendParameters{ to: originalReferrer!!, value: splitShare, mode: SendIgnoreErrors, body: "Spillover Uplvl Commission".asComment() }); }
-                else { send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors, body: "Missed Spillover Uplvl Comm".asComment() }); }
-                let actualReferrerUser: User = self.users.get(actualReferrer!!)!!;
-                if (actualReferrerUser.level >= level) { send(SendParameters{ to: actualReferrer!!, value: splitShare, mode: SendIgnoreErrors, body: "Direct Uplvl Commission".asComment() }); }
-                else { send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors, body: "Missed Direct Uplvl Comm".asComment() }); }
-
-            } else {
-                if (actualReferrer != null && self.users.get(actualReferrer!!)!!.level >= level) { send(SendParameters{ to: actualReferrer!!, value: referralUplineShare, mode: SendIgnoreErrors, body: "Uplvl Commission".asComment() }); }
-                else { send(SendParameters{ to: self.creatorWallet3, value: referralUplineShare, mode: SendIgnoreErrors, body: "Missed Uplvl Commission".asComment() }); }
-            }
-            unallocatedFunds -= referralUplineShare;
+        // Referral Commission Logic (The Split)
+        let isSpillover: Bool = false;
+        if (originalReferrer != null && actualReferrer != null && originalReferrer != actualReferrer) {
+            isSpillover = true;
         }
 
+        if (isSpillover) {
+            // CASE: SPILLOVER DETECTED - SPLIT 50/50
+            let splitShare: Int = referralUplineShare / 2;
+            
+            // Part A: Pay Original Referrer (Link Owner)
+            let origUser: User? = self.users.get(originalReferrer!!);
+            if (origUser != null && origUser!!.level >= level) {
+                send(SendParameters{ to: originalReferrer!!, value: splitShare, mode: SendIgnoreErrors, body: "Spillover Link Commission".asComment() });
+            } else {
+                send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors, body: "Missed Spillover Link Comm".asComment() });
+            }
+
+            // Part B: Pay Actual Referrer (Slot Owner)
+            let actUser: User? = self.users.get(actualReferrer!!);
+            if (actUser != null && actUser!!.level >= level) {
+                send(SendParameters{ to: actualReferrer!!, value: splitShare, mode: SendIgnoreErrors, body: "Spillover Slot Commission".asComment() });
+            } else {
+                send(SendParameters{ to: self.creatorWallet3, value: splitShare, mode: SendIgnoreErrors, body: "Missed Spillover Slot Comm".asComment() });
+            }
+        } else {
+            // CASE: NO SPILLOVER - 100% to Actual Referrer
+            if (actualReferrer != null) {
+                let actUser: User? = self.users.get(actualReferrer!!);
+                if (actUser != null && actUser!!.level >= level) {
+                    send(SendParameters{ to: actualReferrer!!, value: referralUplineShare, mode: SendIgnoreErrors, body: "Direct Commission".asComment() });
+                } else {
+                    send(SendParameters{ to: self.creatorWallet3, value: referralUplineShare, mode: SendIgnoreErrors, body: "Missed Direct Commission".asComment() });
+                }
+            } else {
+                // No referrer at all (e.g. joined via admin)
+                send(SendParameters{ to: self.creatorWallet3, value: referralUplineShare, mode: SendIgnoreErrors, body: "System Referral Commission".asComment() });
+            }
+        }
+        unallocatedFunds = unallocatedFunds - referralUplineShare;
+
+        // Global Spillover Pool Distribution (Round Robin)
         if (spilloverShare > 0) {
             let recipientFound: Bool = false;
             if (self.totalUsers > 0) {
                 let i: Int = 0;
+                // First attempt: search current cycle
                 while (i < self.totalUsers && !recipientFound) {
                     let currentIndex: Int = (self.spilloverRecipientIndex + i) % self.totalUsers;
                     let potentialRecipientAddress: Address = self.userList.get(currentIndex)!!;
                     let potentialRecipient: User = self.users.get(potentialRecipientAddress)!!;
+                    
                     if (potentialRecipient.level >= level) {
-                        let lastCycleOpt: Int? = self.userLastCycle.get(potentialRecipientAddress);
                         let lastCycle: Int = 0;
+                        let lastCycleOpt: Int? = self.userLastCycle.get(potentialRecipientAddress);
                         if (lastCycleOpt != null) { lastCycle = lastCycleOpt!!; }
 
                         if (lastCycle < self.spilloverCycle) {
-                            send(SendParameters{ to: potentialRecipientAddress, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover Reward".asComment() });
+                            send(SendParameters{ to: potentialRecipientAddress, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover Pool Reward".asComment() });
                             self.userLastCycle.set(potentialRecipientAddress, self.spilloverCycle);
                             self.spilloverRecipientIndex = (currentIndex + 1) % self.totalUsers;
                             recipientFound = true;
                         }
                     }
-                    i += 1;
+                    i = i + 1;
                 }
             }
 
+            // If no one found in current cycle, increment cycle and search again
             if (!recipientFound && self.totalUsers > 0) {
-                self.spilloverCycle += 1;
+                self.spilloverCycle = self.spilloverCycle + 1;
                 let i: Int = 0;
                 while (i < self.totalUsers && !recipientFound) {
                     let currentIndex: Int = (self.spilloverRecipientIndex + i) % self.totalUsers;
@@ -664,22 +718,24 @@ contract TonCrown with Deployable, OwnableTransferable {
                     let potentialRecipient: User = self.users.get(potentialRecipientAddress)!!;
 
                     if (potentialRecipient.level >= level) {
-                        send(SendParameters{ to: potentialRecipientAddress, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover Reward (New Cycle)".asComment() });
+                        send(SendParameters{ to: potentialRecipientAddress, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover Pool (New Cycle)".asComment() });
                         self.userLastCycle.set(potentialRecipientAddress, self.spilloverCycle);
                         self.spilloverRecipientIndex = (currentIndex + 1) % self.totalUsers;
                         recipientFound = true;
                     }
-                    i += 1;
+                    i = i + 1;
                 }
             }
 
             if (!recipientFound) {
-                send(SendParameters{ to: self.creatorWallet3, value: spilloverShare, mode: SendIgnoreErrors, body: "Spillover to Creator Wallet".asComment() });
+                send(SendParameters{ to: self.creatorWallet3, value: spilloverShare, mode: SendIgnoreErrors, body: "Unclaimed Spillover to Creator".asComment() });
             }
-            unallocatedFunds -= spilloverShare;
+            unallocatedFunds = unallocatedFunds - spilloverShare;
         }
+
+        // Safety Fallback (Unallocated Funds)
         if (unallocatedFunds > 0) {
-            send(SendParameters{ to: self.creatorWallet3, value: unallocatedFunds, mode: SendIgnoreErrors, body: "Unallocated Funds".asComment() });
+            send(SendParameters{ to: self.creatorWallet3, value: unallocatedFunds, mode: SendIgnoreErrors, body: "Unallocated Balance".asComment() });
         }
     }
 
@@ -770,6 +826,78 @@ contract TonCrown with Deployable, OwnableTransferable {
     }
 
     get fun getUsdtJettonWalletAddress(): Address {
-    return self.usdtJettonWalletAddress;
+        return self.usdtJettonWalletAddress;
+    }
+
+    // NEW GETTER: Returns all stake IDs for a user. (FIXED)
+    get fun getUserStakeIds(userAddress: Address): map<Int, Bool> {
+        let user: User? = self.users.get(userAddress);
+        if (user == null) {
+            return emptyMap(); // Return an empty map if user doesn't exist
+        }
+        let stakeIds: map<Int, Bool> = emptyMap();
+        let stakeCounter: Int = user!!.stakeCounter;
+        let i: Int = 0;
+        while(i < stakeCounter) {
+            if(user!!.stakes.get(i) != null) {
+                stakeIds.set(i, true);
+            }
+            i = i + 1;
+        }
+        return stakeIds;
+    }
+
+    get fun getStakeDetails(userAddress: Address, stakeId: Int): StakeDetails? {
+        let user: User? = self.users.get(userAddress);
+        if (user == null) {
+            return null;
+        }
+        let stake: StakeInfo? = user!!.stakes.get(stakeId);
+        if (stake == null) {
+            return null;
+        }
+
+        let currentStake: StakeInfo = stake!!;
+        let pendingReward: Int = 0;
+
+        if (currentStake.isActive) {
+            let currentTime: Int = now();
+            let stakeEndTime: Int = currentStake.startTime + currentStake.duration;
+            let effectiveTime: Int = (currentTime < stakeEndTime) ? currentTime : stakeEndTime;
+            let daysSinceLastClaim: Int = (effectiveTime - currentStake.lastClaim) / self.SECONDS_PER_DAY;
+
+            if (daysSinceLastClaim > 0) {
+                let vipConfig: VipConfig = self.vipConfigs.get(currentStake.vipClass)!!;
+                let dailyReward: Int = currentStake.amount * vipConfig.stakingRoi / 10000;
+                pendingReward = dailyReward * daysSinceLastClaim;
+            }
+        }
+
+        return StakeDetails {
+            stakeId: currentStake.stakeId,
+            amount: currentStake.amount,
+            startTime: currentStake.startTime,
+            duration: currentStake.duration,
+            vipClass: currentStake.vipClass,
+            autoRestake: currentStake.autoRestake,
+            lastClaim: currentStake.lastClaim,
+            totalClaimed: currentStake.totalClaimed,
+            isActive: currentStake.isActive,
+            stakedAsset: currentStake.stakedAsset,
+            pendingReward: pendingReward
+        };
+    }
+
+    get fun getUserReferralInfo(userAddress: Address): UserReferralInfo? {
+        let user: User? = self.users.get(userAddress);
+        if (user == null) {
+            return null;
+        }
+        return UserReferralInfo {
+            referrer: user!!.referrer,
+            directReferrals: user!!.directReferrals,
+            totalReferrals: user!!.totalReferrals,
+            downlines: user!!.downlines
+        };
+    }
 }
-} 

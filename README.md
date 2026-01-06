@@ -1,5 +1,8 @@
 # toncrown
 
+## Compile recent build
+npx tact --config tact.config.json 
+
 ## Project structure
 
 -   `contracts` - source code of all the smart contracts of the project and their dependencies.

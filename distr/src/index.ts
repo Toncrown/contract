@@ -38,7 +38,7 @@ class TonCrownDistributor {
     console.info(`Config: Contract=${CONTRACT_ADDRESS.toString()}, Interval=60min`);
 
     if (!DDISTRIBUTOR_PRIVATE_KEY || DDISTRIBUTOR_PRIVATE_KEY.length < 24) {
-      throw new Error("DDISTRIBUTOR_PRIVATE_KEY is not set or invalid in .env file.");
+      throw new Error("DISTRIBUTOR_PRIVATE_KEY is not set or invalid in .env file.");
     }
     
     try {
