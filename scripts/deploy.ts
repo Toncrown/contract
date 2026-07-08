@@ -40,13 +40,10 @@ export async function run(provider: NetworkProvider) {
     console.log('Waiting for contract deployment to be confirmed...');
     await provider.waitForDeploy(tonCrown.address);
 
-    console.log('✅ Contract deployed successfully!');
-    console.log('---------------------------------');
-    console.log('📋 Deployment Summary:');
-    console.log('   -> Contract: TonCrown');
-    console.log(`   -> Address: ${tonCrown.address.toString()}`);
-    console.log(`   -> Owner: ${ownerAddress.toString()}`);
-    console.log(`   -> Network: ${provider.network()}`);
-    console.log('---------------------------------');
-    console.log('You can now update the CONTRACT_ADDRESS in your DApp with the new address above.');
+    console.log('Contract deployed successfully!');
+    console.log('Deployment Summary:');
+    console.log('Contract: TonCrown');
+    console.log(`Address: ${tonCrown.address.toString()}`);
+    console.log(`Owner: ${ownerAddress.toString()}`);
+    console.log(`Network: ${provider.network()}`);
 }
