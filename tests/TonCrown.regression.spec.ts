@@ -26,6 +26,19 @@ describe('TonCrown regressions', () => {
         c.send(u.getSender(), { value: toNano(COSTS[lvl]) + BUFFER + extra },
             { $$type: 'UpgradeLevel', targetLevel: BigInt(lvl), referrerAddress: ref });
 
+    function hasBody(res: any, text: string) {
+        for (const tx of res.transactions)
+            for (const m of (tx.outMessages?.values?.() ?? [])) {
+                if (m.info.type !== 'internal') continue;
+                if ((m.info as any).src.toString() !== c.address.toString()) continue;
+                try {
+                    const sl = m.body.beginParse();
+                    if (sl.remainingBits >= 32 && sl.loadUint(32) === 0 && sl.loadStringTail() === text) return true;
+                } catch { }
+            }
+        return false;
+    }
+
     function paidTo(res: any, to: Address) {
         let total = 0n;
         for (const tx of res.transactions)
@@ -212,12 +225,50 @@ describe('TonCrown regressions', () => {
         expect(status.totalUsers).toBe(1n);
     });
 
+    // ---------------------------------------------------------------- spillover
+    it('rotates spillover across eligible users instead of paying the creator wallet', async () => {
+        await deploy('500');
+        // three level-2 users are eligible for level-1 spillover
+        const pool: SandboxContract<TreasuryContract>[] = [];
+        for (let i = 0; i < 3; i++) {
+            const p = await bc.treasury('pool' + i);
+            await upgrade(p, 1);
+            await upgrade(p, 2);
+            pool.push(p);
+        }
+        bc.now! += 10;
+
+        const hits = [0, 0, 0];
+        let creatorFallbacks = 0;
+        for (let i = 0; i < 6; i++) {
+            const buyer = await bc.treasury('sbuyer' + i);
+            const res = await upgrade(buyer, 1);
+            pool.forEach((p, idx) => { if (paidTo(res, p.address) > 0n) hits[idx]++; });
+            if (hasBody(res, 'Unclaimed Spillover')) creatorFallbacks++;
+        }
+        console.log(`  spillover hits per eligible user: ${hits.join(' / ')}`);
+        // every purchase found a real recipient, spread evenly
+        expect(hits.reduce((a, b) => a + b, 0)).toBe(6);
+        expect(Math.max(...hits) - Math.min(...hits)).toBeLessThanOrEqual(1);
+        expect(creatorFallbacks).toBe(0);
+    });
+
+    it('never pays spillover to the buyer of that purchase', async () => {
+        await deploy('500');
+        const solo = await bc.treasury('solo');
+        await upgrade(solo, 1);
+        bc.now! += 10;
+        const res = await upgrade(solo, 2);   // only eligible level-2 user is the buyer
+        expect(paidTo(res, solo.address)).toBe(0n);
+        expect(hasBody(res, 'Unclaimed Spillover')).toBe(true);   // falls back instead
+    });
+
     // ---------------------------------------------------------------- gas ceiling
     it('upgrade gas stays flat as the user base grows', async () => {
-        await deploy('20000');
+        await deploy('60000');
         const sampled: string[] = [];
         let peak = 0n;
-        for (let n = 0; n < 240; n++) {
+        for (let n = 0; n < 1000; n++) {
             const u = await bc.treasury('u' + n);
             const r: any = await upgrade(u, 1);
             let thisUpgrade = 0n;
@@ -230,10 +281,10 @@ describe('TonCrown regressions', () => {
                 thisUpgrade = d.computePhase.gasUsed;
             }
             if (thisUpgrade > peak) peak = thisUpgrade;
-            if (n === 0 || n === 119 || n === 239) sampled.push(`${n + 1}:${thisUpgrade}`);
+            if (n === 0 || n === 249 || n === 499 || n === 999) sampled.push(`${n + 1}:${thisUpgrade}`);
         }
         console.log(`  UpgradeLevel gas at users ${sampled.join('  ')}   peak=${peak}`);
         // the unbounded scan hit the 1,000,000 ceiling (exit -14) at ~200 users
-        expect(peak).toBeLessThan(400000n);
-    }, 600000);
+        expect(peak).toBeLessThan(120000n);
+    }, 1800000);
 });

@@ -34,78 +34,124 @@ storage. The migration copies those rows into the new contract and moves the TON
 The old contract's TON balance is moved with `OwnerWithdraw`, which the old contract
 already supports.
 
-## Procedure
+## The short version
 
-Run steps 1–3 against **testnet first** with a snapshot of real mainnet data.
+Four commands, in order. Steps 2–4 are scripts in `scripts/`.
 
-### 1. Snapshot the live contract
+```bash
+# 0. one-off: put these in .env
+#    OLD_CONTRACT=EQ...     the live contract
+#    NEW_CONTRACT=EQ...     filled in after step 1
 
-Page through the old contract's getters and write the result to a file. Do this while the
-old contract is paused-by-convention (announce a maintenance window; the old contract has
-no `SetPaused`, so stop the frontend from sending upgrade/stake transactions).
+# 1. stop the frontend, then deploy the fixed contract with the SAME owner wallet
+npx blueprint run deploy
+
+# 2. read every user record out of the old contract -> migration-snapshot.json
+npx blueprint run exportState
+
+# 3. replay them into the new contract (owner wallet; safe to re-run if interrupted)
+npx blueprint run importState
+
+# 4. prove the new contract matches the snapshot, and print the funding number
+npx blueprint run verifyMigration
+```
+
+Then fund the new contract, send `LockImports`, and point the frontend and the `distr/`
+service at the new address.
+
+Run the whole thing on **testnet first**, against a snapshot of real mainnet data.
+
+## What each script does
+
+**`exportState`** reads `getPlatformStats`, then walks `getUserAddressByIndex` →
+`getUserInfo` → `getStakeDetails` for every user, and writes `migration-snapshot.json`.
+It talks to the old contract through raw get-method calls and reads result tuples by
+position, because the old contract predates the `linkReferrer` field and this build's
+generated wrapper would mis-parse its `User` struct. It paces itself for toncenter's
+free tier and retries with backoff, so a dropped request never silently loses a user.
+It warns loudly if the exported count does not match `totalUsers`.
+
+**`importState`** sends `ImportUser` for every user **in original registration order**
+(userList index order drives spillover rotation), then `ImportDownline`, `ImportStake`,
+`ImportPlatformTotals`. Progress is written to `migration-progress.json` after every
+message and completed items are skipped, so if it dies at user 700 of 1000 you just run
+it again.
+
+Downlines are rebuilt from each user's `referrer`, in registration order. The old
+contract assigned slots by incrementing `directReferrals` as children attached, so
+registration order reproduces the original slot numbering exactly — no map parsing
+needed.
+
+**`verifyMigration`** is read-only. It compares every user's level, VIP class, referrer,
+referral counts, registration time, pending check-in balance, earnings and every stake
+against the snapshot, and exits non-zero on any mismatch. It finishes by printing the
+number you need:
 
 ```
-getPlatformStats()                      -> totalUsers, totals
-getUserAddressByIndex(i)  for i in 0..totalUsers-1
-getUserInfo(addr)                       -> per user
-getUserReferralInfo(addr)               -> downlines map
-getUserStakeIds(addr) + getStakeDetails(addr, id)
-getPlatformEarningsInfo()
+claimable right now:   142.31 TON   <- fund at least this
+active staked TON:     8,400.00 TON  (comes due as stakes mature)
+contract balance:      0.50 TON
 ```
 
-Record the block/logical time of the snapshot. Any transaction the old contract accepts
-after this point is lost, which is why the frontend must be stopped first.
+## One judgement call the import makes for you
 
-### 2. Deploy the fixed contract
+The old contract stored a single `referrer` — the matrix parent. The new contract also
+tracks `linkReferrer`, the wallet named on the registration link, which the old contract
+never persisted, so it cannot be recovered.
 
-Deploy with the **same owner address**. `init(owner)` sets `importsLocked = false`, so the
-owner can seed state, and `forwardStakeCapital = true`, which preserves the current money
-flow until you decide otherwise.
+The scripts default to `linkReferrer = referrer`. That pays the user's actual upline the
+full referral split, which is what already happened for directly-placed users. For
+users who were placed by spillover, the original inviter is unknowable, and this hands
+that share to their matrix parent instead.
 
-### 3. Import, in this order
+Set `MIGRATE_LINK_REFERRER=none` to leave it null instead — that share then goes to
+`creatorWallet3` as "System Link Commission". The default is the one that favours users.
 
-1. `ImportUser` for every user, **in the original registration order**. `userList` indexes
-   and therefore spillover rotation depend on that order.
-2. `ImportDownline` for every `(parent, slot, child)` pair. Both parties must already be
-   imported, which the receiver enforces.
-3. `ImportStake` for every stake, including inactive ones (`stakeCounter` is derived from
-   the highest imported id).
-4. `ImportPlatformTotals` once.
+## Step by step, in full
 
-Batch these; each is a normal internal message costing ordinary gas.
+### 1. Stop the frontend
 
-### 4. Verify before locking
+The old contract has no `SetPaused`, so this is the only way to stop new transactions.
+Anything it accepts after the snapshot in step 2 is lost.
 
-Compare old and new side by side:
+### 2. Snapshot
 
-- `getPlatformStats()` matches on every field.
-- `getUserInfo` matches for a random sample plus every user holding a stake or a pending
-  check-in balance.
-- `getTreasuryLiabilities(0, 50)` summed across pages equals the sum of pending rewards
-  computed from the snapshot.
+`npx blueprint run exportState`. Keep `migration-snapshot.json` — it is your audit trail.
 
-`LockImports` is **one-way** — send it only after verification passes. After it, the owner
-can no longer write user records.
+### 3. Deploy the fixed contract
 
-### 5. Move the money
+Same owner address. `init(owner)` sets `importsLocked = false` so state can be seeded,
+and `forwardStakeCapital = true`, preserving the current money flow.
 
-`OwnerWithdraw` from the old contract, then fund the new one. Fund it with at least the
-`tonDueNow` figure from step 4 plus a working buffer (see below).
+### 4. Import
 
-### 6. Cut over
+`npx blueprint run importState`, from the owner wallet.
 
-Point the frontend and the `distr/` distributor service at the new address, and set
+### 5. Verify before locking
+
+`npx blueprint run verifyMigration`. `LockImports` is **one-way** — send it only after
+this passes clean. After it, the owner can no longer write user records.
+
+### 6. Move the money
+
+`OwnerWithdraw` from the old contract, then fund the new one with at least the
+"claimable right now" figure plus a working buffer.
+
+### 7. Cut over
+
+Point the frontend and the `distr/` distributor service at the new address, and send
 `SetDistributor` on the new contract.
 
 > `distr/src/services/distributionService.ts` reads `getUserInfo` by tuple index
-> (`tupleItems[1]` = level, etc.). `linkReferrer` was appended to the **end** of the `User`
-> struct so existing indexes are unchanged, but re-verify before cutover. The service also
-> discovers users by scraping transactions; switch it to `getUserListPaginated`.
+> (`tupleItems[1]` = level, etc.). `linkReferrer` was appended to the **end** of the
+> `User` struct so existing indexes are unchanged, but re-verify before cutover. The
+> service also discovers users by scraping transactions; switch it to
+> `getUserListPaginated`.
 
-### 7. Retire the old contract
+### 8. Retire the old contract
 
-Leave it deployed with a near-zero balance. Do not delete it — users' explorers will still
-link to it, and its storage is the audit trail for the snapshot.
+Leave it deployed with a near-zero balance. Do not delete it — explorers still link to
+it, and its storage is the audit trail behind your snapshot.
 
 ## Funding the new contract
 

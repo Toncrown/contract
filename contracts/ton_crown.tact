@@ -344,6 +344,15 @@ contract TonCrown with Deployable, OwnableTransferable {
     userList: map<Int, Address>;
     spilloverNextIndexByBoughtLevel: map<Int, Int>;
 
+    // Spillover eligibility registry. eligibleByLevel is a flat map keyed by
+    // level * ELIGIBLE_KEY_STRIDE + position, which gives one append-only list per
+    // level without needing nested maps. A user is appended to the list for level L
+    // when they reach level L; because upgrades are sequential, a user at level N is
+    // present in every list 1..N, which is exactly the eligibility rule.
+    // This replaces scanning userList on every purchase.
+    eligibleByLevel: map<Int, Address>;
+    eligibleCountByLevel: map<Int, Int>;
+
     // Owner may seed state from a previous deployment until imports are locked.
     importsLocked: Bool;
 
@@ -367,8 +376,13 @@ contract TonCrown with Deployable, OwnableTransferable {
     // Both of these bound loops that used to run over the whole user base. Unbounded,
     // gas grew linearly with user count and UpgradeLevel hit the 1,000,000 gas ceiling
     // (exit code -14) at roughly 200 users, permanently blocking registration.
-    const MAX_SPILLOVER_SCAN: Int = 40;
     const MAX_PLACEMENT_SCAN: Int = 60;
+    // Room for 100M members per level in the flat eligibility key space.
+    const ELIGIBLE_KEY_STRIDE: Int = 100000000;
+    // The registry only holds users who already meet the level requirement, so a
+    // candidate is almost always accepted first try. These few retries only skip the
+    // buyer themselves or an inactive account.
+    const MAX_SPILLOVER_TRIES: Int = 8;
     const SECONDS_PER_DAY: Int = 86400;
     const ASSET_TON: Int = 0;
     const ASSET_USDT: Int = 1;
@@ -414,6 +428,8 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.isPaused = false;
 
         self.spilloverNextIndexByBoughtLevel = emptyMap();
+        self.eligibleByLevel = emptyMap();
+        self.eligibleCountByLevel = emptyMap();
         self.importsLocked = false;
         self.forwardStakeCapital = true;
 
@@ -470,6 +486,10 @@ contract TonCrown with Deployable, OwnableTransferable {
 
         // Only levelCost is distributed/recorded. The gas buffer remains available for internal sends/storage.
         self.distributeFunds(levelCost, senderAddress, oldLevel + 1, purchaseTime);
+
+        // Registered after distribution so the buyer is never a candidate for the very
+        // purchase that made them eligible.
+        self.registerEligible(msg.targetLevel, senderAddress);
 
         self.recordUserTransaction(
             senderAddress,
@@ -873,6 +893,13 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.userList.set(self.totalUsers, msg.userAddress);
         self.users.set(msg.userAddress, imported);
         self.totalUsers = self.totalUsers + 1;
+
+        // Rebuild spillover eligibility: a level-N user belongs in every pool 1..N.
+        let lvl: Int = 1;
+        while (lvl <= msg.level) {
+            self.registerEligible(lvl, msg.userAddress);
+            lvl = lvl + 1;
+        }
     }
 
     // Downlines are restored verbatim rather than replayed through the placement logic,
@@ -1074,6 +1101,19 @@ contract TonCrown with Deployable, OwnableTransferable {
         return 0;
     }
 
+    fun eligibleCount(level: Int): Int {
+        let c: Int? = self.eligibleCountByLevel.get(level);
+        if (c == null) { return 0; }
+        return c!!;
+    }
+
+    // Called once, when a user reaches `level`.
+    fun registerEligible(level: Int, user: Address) {
+        let count: Int = self.eligibleCount(level);
+        self.eligibleByLevel.set(level * self.ELIGIBLE_KEY_STRIDE + count, user);
+        self.eligibleCountByLevel.set(level, count + 1);
+    }
+
     fun distributeSpilloverReward(spilloverShare: Int, boughtLevel: Int, payer: Address, purchaseTime: Int) {
         let minEligibleLevel: Int = boughtLevel;
 
@@ -1082,35 +1122,34 @@ contract TonCrown with Deployable, OwnableTransferable {
             minEligibleLevel = 2;
         }
 
-        let startIndexOpt: Int? = self.spilloverNextIndexByBoughtLevel.get(boughtLevel);
-        let startIndex: Int = 0;
-        if (startIndexOpt != null) {
-            startIndex = startIndexOpt!!;
-        }
-
+        let poolSize: Int = self.eligibleCount(minEligibleLevel);
         let recipientFound: Bool = false;
 
-        if (self.totalUsers > 0) {
-            // Bounded window. The scan used to run over every registered user, so gas
-            // grew linearly with the user base and UpgradeLevel eventually failed with
-            // exit code -14 for everyone.
-            let scanLimit: Int = self.MAX_SPILLOVER_SCAN;
-            if (scanLimit > self.totalUsers) {
-                scanLimit = self.totalUsers;
+        if (poolSize > 0) {
+            let startIndexOpt: Int? = self.spilloverNextIndexByBoughtLevel.get(boughtLevel);
+            let startIndex: Int = 0;
+            if (startIndexOpt != null) {
+                startIndex = startIndexOpt!!;
+            }
+
+            // Constant-gas pick. Every address in this pool already satisfies the level
+            // requirement, so no search over the user base is needed: the pointer just
+            // advances one place per purchase, round robin.
+            let tries: Int = self.MAX_SPILLOVER_TRIES;
+            if (tries > poolSize) {
+                tries = poolSize;
             }
 
             let i: Int = 0;
-            while (i < scanLimit && !recipientFound) {
-                let currentIndex: Int = (startIndex + i) % self.totalUsers;
-                let receiver: Address = self.userList.get(currentIndex)!!;
+            while (i < tries && !recipientFound) {
+                let currentIndex: Int = (startIndex + i) % poolSize;
+                let receiver: Address = self.eligibleByLevel.get(minEligibleLevel * self.ELIGIBLE_KEY_STRIDE + currentIndex)!!;
 
                 // Buyer can never receive their own spillover.
                 if (receiver != payer) {
                     let receiverUser: User = self.users.get(receiver)!!;
 
-                    let eligible: Bool = receiverUser.isActive && receiverUser.registrationTime < purchaseTime && receiverUser.level >= minEligibleLevel;
-
-                    if (eligible) {
+                    if (receiverUser.isActive && receiverUser.registrationTime < purchaseTime) {
                         send(SendParameters{
                             to: receiver,
                             value: spilloverShare,
@@ -1121,8 +1160,7 @@ contract TonCrown with Deployable, OwnableTransferable {
                         self.totalSpilloverRewardsPaid = self.totalSpilloverRewardsPaid + spilloverShare;
                         self.creditSpilloverEarning(receiver, spilloverShare, payer, boughtLevel);
 
-                        self.spilloverNextIndexByBoughtLevel.set(boughtLevel, (currentIndex + 1) % self.totalUsers);
-
+                        self.spilloverNextIndexByBoughtLevel.set(boughtLevel, (currentIndex + 1) % poolSize);
                         recipientFound = true;
                     }
                 }
@@ -1130,10 +1168,8 @@ contract TonCrown with Deployable, OwnableTransferable {
                 i = i + 1;
             }
 
-            // Nobody eligible inside this window: move the window along so the next
-            // purchase scans a different slice rather than re-walking the same dead range.
             if (!recipientFound) {
-                self.spilloverNextIndexByBoughtLevel.set(boughtLevel, (startIndex + scanLimit) % self.totalUsers);
+                self.spilloverNextIndexByBoughtLevel.set(boughtLevel, (startIndex + tries) % poolSize);
             }
         }
 
