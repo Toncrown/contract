@@ -1,4 +1,5 @@
 import { mnemonicToWalletKey } from '@ton/crypto';
+<<<<<<< Updated upstream
 import { WalletContractV4, WalletContractV5R1 } from '@ton/ton';
 
 const getNetwork = async (endpoint: string) => {
@@ -7,6 +8,14 @@ const getNetwork = async (endpoint: string) => {
     // TON's standard mnemonic is 24 words; 12-word phrases exist but are the exception.
     // Rejecting anything but 12 meant a normal Tonkeeper/Tonhub phrase was refused.
     if (!mnemonic || (mnemonic.length !== 24 && mnemonic.length !== 12)) {
+=======
+import { WalletContractV5R1 } from '@ton/ton';
+
+const getNetwork = async (endpoint: string) => {
+    const mnemonic = process.env.WALLET_MNEMONIC?.split(' ');
+
+    if (!mnemonic || mnemonic.length !== 12 && mnemonic.length !== 24) {
+>>>>>>> Stashed changes
         throw new Error(
             `Set MNEMONIC to your wallet's 24-word (or 12-word) recovery phrase. ` +
             `Got ${mnemonic ? mnemonic.length : 0} word(s).`
@@ -15,6 +24,7 @@ const getNetwork = async (endpoint: string) => {
 
     const key = await mnemonicToWalletKey(mnemonic);
 
+<<<<<<< Updated upstream
     // The wallet version decides the derived address. Deriving v4 for a wallet that is
     // actually v5R1 silently produces a different address, which for this project means
     // signing as something other than the contract owner. Run `blueprint run preflight`
@@ -24,6 +34,12 @@ const getNetwork = async (endpoint: string) => {
         version === 'v5' || version === 'v5r1'
             ? WalletContractV5R1.create({ workchain: 0, publicKey: key.publicKey })
             : WalletContractV4.create({ workchain: 0, publicKey: key.publicKey });
+=======
+    const wallet = WalletContractV5R1.create({
+        workchain: 0,
+        publicKey: key.publicKey,
+    });
+>>>>>>> Stashed changes
 
     return {
         endpoint,
