@@ -47,6 +47,8 @@ export type SnapshotUser = {
 export type Snapshot = {
     takenAt: string;
     oldContract: string;
+    /** true when EXPORT_LIMIT was set — a smoke test, never import this. */
+    partial?: boolean;
     totalUsers: number;
     platform: Record<string, string>;
     users: SnapshotUser[];
@@ -95,7 +97,12 @@ export async function run(provider: NetworkProvider) {
     const totalSpilloverRewardsPaid = earnings.readBigNumber().toString();
     const totalCreatorRewardsPaid = earnings.readBigNumber().toString();
 
-    const totalUsers = Number(platform.totalUsers);
+    let totalUsers = Number(platform.totalUsers);
+    const limit = process.env.EXPORT_LIMIT ? Number(process.env.EXPORT_LIMIT) : 0;
+    if (limit > 0 && limit < totalUsers) {
+        console.log(`EXPORT_LIMIT=${limit} — smoke test only, NOT a complete snapshot\n`);
+        totalUsers = limit;
+    }
     console.log(`${totalUsers} users to export\n`);
 
     const users: SnapshotUser[] = [];
@@ -107,7 +114,11 @@ export async function run(provider: NetworkProvider) {
             continue;
         }
 
-        const info = (await call(provider, oldAddress, 'getUserInfo', addrArg(address))).readTuple();
+        const info = (await call(provider, oldAddress, 'getUserInfo', addrArg(address))).readTupleOpt();
+        if (info === null) {
+            console.log(`   [${i}] ${address.toString().slice(0, 12)}… in userList but getUserInfo returned null — skipping`);
+            continue;
+        }
         const items: any[] = [];
         while (info.remaining > 0) items.push(info.pop());
 
@@ -166,6 +177,7 @@ export async function run(provider: NetworkProvider) {
     const snapshot: Snapshot = {
         takenAt: new Date().toISOString(),
         oldContract: oldAddress.toString(),
+        partial: limit > 0,
         totalUsers: users.length,
         platform: {
             ...platform,
@@ -184,5 +196,16 @@ export async function run(provider: NetworkProvider) {
     console.log(`   unclaimed check-in rewards: ${Number(pendingCheckIn) / 1e9} TON`);
     if (users.length !== totalUsers) {
         console.log(`\n   WARNING: expected ${totalUsers} users but exported ${users.length}. Do not import until this is understood.`);
+    }
+    if (limit > 0) {
+        console.log(`\n   PARTIAL SNAPSHOT (EXPORT_LIMIT=${limit}). Re-run without EXPORT_LIMIT before importing.`);
+    }
+
+    // Cheap sanity check that the tuple positions actually lined up.
+    const odd = users.filter((u) => Number(u.level) < 0 || Number(u.level) > 10 || Number(u.registrationTime) <= 0);
+    if (odd.length > 0) {
+        console.log(`\n   ${odd.length} user(s) have an implausible level or registrationTime.`);
+        console.log(`   That usually means the getUserInfo tuple layout differs from what this script assumes.`);
+        odd.slice(0, 5).forEach((u) => console.log(`      ${u.address}  level=${u.level} regTime=${u.registrationTime}`));
     }
 }

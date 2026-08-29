@@ -68,6 +68,7 @@ export async function run(provider: NetworkProvider) {
 
     const status = await c.getGetTreasuryStatus();
     if (status.importsLocked) throw new Error('Imports are locked on this contract — nothing can be written');
+    if (snap.partial) throw new Error('This snapshot was taken with EXPORT_LIMIT set and is incomplete. Re-run exportState without it.');
 
     const progress = loadProgress();
     const users = [...snap.users].sort((a, b) => a.index - b.index);
