@@ -69,6 +69,11 @@ struct User {
     // Transaction history
     transactionCounter: Int as uint32;
     transactions: map<Int, UserTransaction>;
+
+    // Referrer taken from the registration link. Captured once, at registration, and
+    // never re-read from a later message — accepting it on every upgrade let a caller
+    // point the referral share at any address they liked, their own included.
+    linkReferrer: Address?;
 }
 
 struct VipConfig {
@@ -158,6 +163,66 @@ message OwnerWithdraw {
 
 message ClaimCheckInRewards {}
 
+message SetPaused {
+    paused: Bool;
+}
+
+message SetStakeCapitalPolicy {
+    forwardToTreasuryWallet: Bool;
+}
+
+message UpgradeContract {
+    code: Cell;
+}
+
+message ImportUser {
+    userAddress: Address;
+    referrer: Address?;
+    linkReferrer: Address?;
+    level: Int as uint8;
+    vipClass: Int as uint8;
+    directReferrals: Int as uint16;
+    totalReferrals: Int as uint32;
+    otherReferrals: Int as uint32;
+    lastCheckIn: Int as uint32;
+    levelExpiration: Int as uint32;
+    totalEarned: Int as coins;
+    isActive: Bool;
+    registrationTime: Int as uint32;
+    spilloverIndex: Int as uint16;
+    pendingCheckInRewards: Int as coins;
+    totalCheckInEarned: Int as coins;
+    totalCheckInClaimed: Int as coins;
+    totalStakingClaimed: Int as coins;
+    totalReferralEarned: Int as coins;
+    totalSpilloverEarned: Int as coins;
+}
+
+message ImportDownline {
+    parent: Address;
+    slot: Int as uint16;
+    child: Address;
+}
+
+message ImportStake {
+    userAddress: Address;
+    stake: StakeInfo;
+}
+
+message ImportPlatformTotals {
+    totalStakedTon: Int as coins;
+    totalStakedUsdt: Int as coins;
+    totalDistributed: Int as coins;
+    activeStakes: Int as uint32;
+    totalCheckInRewardsAccrued: Int as coins;
+    totalCheckInRewardsClaimed: Int as coins;
+    totalReferralRewardsPaid: Int as coins;
+    totalSpilloverRewardsPaid: Int as coins;
+    totalCreatorRewardsPaid: Int as coins;
+}
+
+message LockImports {}
+
 struct UserTransaction {
     txId: Int as uint32;
     timestamp: Int as uint32;
@@ -197,6 +262,50 @@ struct PlatformEarningsInfo {
     contractBalance: Int as coins;
 }
 
+struct AdminUserSnapshot {
+    userAddress: Address;
+    level: Int as uint8;
+    vipClass: Int as uint8;
+    isActive: Bool;
+    pendingCheckInRewards: Int as coins;
+    pendingStakingRewardsTon: Int as coins;
+    pendingStakingRewardsUsdt: Int as coins;
+    activeStakeCount: Int as uint16;
+    activeStakedTon: Int as coins;
+    activeStakedUsdt: Int as coins;
+    maturedCapitalTon: Int as coins;
+    maturedCapitalUsdt: Int as coins;
+    tonDueNow: Int as coins;
+}
+
+struct TreasuryLiabilities {
+    fromIndex: Int as uint32;
+    toIndex: Int as uint32;
+    usersScanned: Int as uint32;
+    pendingCheckInRewards: Int as coins;
+    pendingStakingRewardsTon: Int as coins;
+    pendingStakingRewardsUsdt: Int as coins;
+    maturedCapitalTon: Int as coins;
+    maturedCapitalUsdt: Int as coins;
+    activeStakedTon: Int as coins;
+    activeStakedUsdt: Int as coins;
+    activeStakeCount: Int as uint32;
+    tonDueNow: Int as coins;
+}
+
+struct TreasuryStatus {
+    contractBalance: Int as coins;
+    minReserve: Int as coins;
+    totalUsers: Int as uint32;
+    unclaimedCheckInRewards: Int as coins;
+    totalStakedTon: Int as coins;
+    totalStakedUsdt: Int as coins;
+    activeStakes: Int as uint32;
+    isPaused: Bool;
+    importsLocked: Bool;
+    forwardStakeCapital: Bool;
+}
+
 struct UserStakeSummary {
     totalStakes: Int as uint16;
     activeStakes: Int as uint16;
@@ -207,6 +316,10 @@ struct UserStakeSummary {
 //------------------------------------------------------------------
 // CONTRACT: TONCROWN
 //------------------------------------------------------------------
+
+// TVM SETCODE. The previous deployment had no way to ship a fix, so a bug could only
+// be resolved by redeploying to a new address and migrating every user across.
+asm fun setContractCode(code: Cell) { SETCODE }
 
 contract TonCrown with Deployable, OwnableTransferable {
     owner: Address;
@@ -231,6 +344,14 @@ contract TonCrown with Deployable, OwnableTransferable {
     userList: map<Int, Address>;
     spilloverNextIndexByBoughtLevel: map<Int, Int>;
 
+    // Owner may seed state from a previous deployment until imports are locked.
+    importsLocked: Bool;
+
+    // Whether staking capital is forwarded out to creatorWallet3 on deposit. When true
+    // the contract owes ROI and capital it does not hold, and has to be topped up
+    // manually to stay solvent.
+    forwardStakeCapital: Bool;
+
     // Platform-level earnings tracking
     totalCheckInRewardsAccrued: Int as coins;
     totalCheckInRewardsClaimed: Int as coins;
@@ -243,6 +364,11 @@ contract TonCrown with Deployable, OwnableTransferable {
     const MIN_STAKE_DURATION: Int = 14;
     const MAX_STAKE_DURATION: Int = 730;
     const MAX_DIRECT_REFERRALS: Int = 6;
+    // Both of these bound loops that used to run over the whole user base. Unbounded,
+    // gas grew linearly with user count and UpgradeLevel hit the 1,000,000 gas ceiling
+    // (exit code -14) at roughly 200 users, permanently blocking registration.
+    const MAX_SPILLOVER_SCAN: Int = 40;
+    const MAX_PLACEMENT_SCAN: Int = 60;
     const SECONDS_PER_DAY: Int = 86400;
     const ASSET_TON: Int = 0;
     const ASSET_USDT: Int = 1;
@@ -288,6 +414,8 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.isPaused = false;
 
         self.spilloverNextIndexByBoughtLevel = emptyMap();
+        self.importsLocked = false;
+        self.forwardStakeCapital = true;
 
         self.totalCheckInRewardsAccrued = 0;
         self.totalCheckInRewardsClaimed = 0;
@@ -317,9 +445,12 @@ contract TonCrown with Deployable, OwnableTransferable {
     receive(msg: UpgradeLevel) {
         self.requireNotPaused();
         let senderAddress: Address = sender();
-        let originalReferrer: Address? = msg.referrerAddress;
 
-        let currentUser: User = self.getOrRegisterUser(senderAddress, originalReferrer);
+        require(msg.targetLevel >= 1 && msg.targetLevel <= 10, "Invalid level");
+
+        // msg.referrerAddress is honoured only on the very first call, when the user is
+        // created. From then on distributeFunds reads the referrers stored on the user.
+        let currentUser: User = self.getOrRegisterUser(senderAddress, msg.referrerAddress);
 
         require(msg.targetLevel == currentUser.level + 1, "Must upgrade sequentially");
         let levelCost: Int = self.levelCosts.get(msg.targetLevel)!!;
@@ -338,7 +469,7 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.users.set(senderAddress, currentUser);
 
         // Only levelCost is distributed/recorded. The gas buffer remains available for internal sends/storage.
-        self.distributeFunds(levelCost, senderAddress, oldLevel + 1, originalReferrer, purchaseTime);
+        self.distributeFunds(levelCost, senderAddress, oldLevel + 1, purchaseTime);
 
         self.recordUserTransaction(
             senderAddress,
@@ -351,7 +482,24 @@ contract TonCrown with Deployable, OwnableTransferable {
             "Level Upgrade"
         );
 
-        self.reply("Level upgrade successful".asComment());
+        // Anything paid above the level price and the gas buffer goes straight back.
+        let excess: Int = context().value - levelCost - self.UPGRADE_GAS_BUFFER;
+        if (excess > 0) {
+            send(SendParameters{
+                to: senderAddress,
+                value: excess,
+                mode: SendIgnoreErrors,
+                bounce: false,
+                body: "Upgrade Change".asComment()
+            });
+        }
+
+        // Deliberately not self.reply(): reply carries SendRemainingValue (mode 64), and
+        // mode 64 attaches the inbound message value untouched by the payouts above —
+        // those come out of the account balance, not out of the message. The result was
+        // that the buyer got their entire payment refunded whenever the contract balance
+        // happened to cover it, and silently did not whenever it did not.
+        self.confirm(senderAddress, "Level upgrade successful");
     }
 
     receive(msg: CheckIn) {
@@ -408,7 +556,7 @@ contract TonCrown with Deployable, OwnableTransferable {
 
         let claimAmount: Int = user.pendingCheckInRewards;
         require(claimAmount > 0, "No check-in rewards to claim");
-        require(myBalance() >= claimAmount + self.MIN_CONTRACT_RESERVE, "Insufficient contract balance");
+        require(self.availableBalance() >= claimAmount + self.MIN_CONTRACT_RESERVE, "Insufficient contract balance");
 
         // Zero out BEFORE sending — prevents double-claim.
         user.pendingCheckInRewards = 0;
@@ -431,10 +579,14 @@ contract TonCrown with Deployable, OwnableTransferable {
 
         self.users.set(senderAddress, user);
 
+        // SendPayGasSeparately so the user receives exactly what was credited against
+        // their balance, and no SendIgnoreErrors: the pending balance has already been
+        // zeroed above, so a dropped action here would destroy the reward instead of
+        // reverting the whole transaction.
         send(SendParameters{
             to: senderAddress,
             value: claimAmount,
-            mode: SendIgnoreErrors,
+            mode: SendPayGasSeparately,
             body: "Check-in Rewards Claim".asComment()
         });
 
@@ -493,39 +645,77 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.totalStakedTon += stakeAmount;
         self.activeStakes += 1;
 
-        // Preserved existing flow: staking capital is forwarded to creatorWallet3/treasury.
-        // Production operation must ensure this treasury is funded for future refunds/rewards.
-        send(SendParameters{
-            to: self.creatorWallet3,
-            value: stakeAmount,
-            mode: SendIgnoreErrors,
-            body: "TON Staking Capital".asComment()
-        });
-        self.reply("Staking successful".asComment());
+        // Staking capital is forwarded to creatorWallet3/treasury only while that policy
+        // is switched on. While it is on, the contract owes ROI and capital it no longer
+        // holds and has to be topped up manually to stay solvent.
+        if (self.forwardStakeCapital) {
+            send(SendParameters{
+                to: self.creatorWallet3,
+                value: stakeAmount,
+                mode: SendPayGasSeparately,
+                body: "TON Staking Capital".asComment()
+            });
+        }
+
+        // Deliberately not self.reply() — see the note in UpgradeLevel. Here mode 64 sent
+        // the staker their whole deposit back while the capital was also forwarded to the
+        // treasury and a fully funded stake position was recorded against the contract.
+        self.confirm(senderAddress, "Staking successful");
     }
 
     receive(msg: JettonTransferNotification) {
-        self.requireNotPaused();
         require(sender() == self.usdtJettonWalletAddress, "Unknown jetton wallet");
 
         let stakerAddress: Address = msg.sender;
         let usdtReceived: Int = msg.amount;
+
+        // Past this point every rejection returns the jettons instead of throwing.
+        // Throwing fails the notification but does not undo the transfer, so the USDT
+        // was left stranded in the contract's jetton wallet with nothing recorded
+        // against it — a malformed payload or a non-VIP sender destroyed the deposit.
+        if (self.isPaused) {
+            self.refundJettons(stakerAddress, usdtReceived, "Contract is paused");
+            return;
+        }
+
         let payloadSlice: Slice = msg.forwardPayload;
+        let duration: Int = 0;
+        let autoRestake: Bool = false;
+        let referrerAddress: Address? = null;
+        let parsed: Bool = true;
 
-        let payload: StakeUsdtPayload = StakeUsdtPayload{
-            duration: payloadSlice.loadUint(32),
-            autoRestake: payloadSlice.loadBool(),
-            referrerAddress: payloadSlice.loadAddress()
-        };
+        try {
+            duration = payloadSlice.loadUint(32);
+            autoRestake = payloadSlice.loadBool();
+            referrerAddress = payloadSlice.loadAddress();
+        } catch (e) {
+            parsed = false;
+        }
 
-        let user: User = self.getOrRegisterUser(stakerAddress, payload.referrerAddress);
-        user = self.refreshUserLevelStatus(stakerAddress);
+        if (!parsed) {
+            self.refundJettons(stakerAddress, usdtReceived, "Invalid stake payload");
+            return;
+        }
 
-        require(user.vipClass > 0, "VIP status required for staking");
-        require(payload.duration >= self.MIN_STAKE_DURATION && payload.duration <= self.MAX_STAKE_DURATION, "Invalid duration");
+        if (duration < self.MIN_STAKE_DURATION || duration > self.MAX_STAKE_DURATION) {
+            self.refundJettons(stakerAddress, usdtReceived, "Invalid staking duration");
+            return;
+        }
+
+        // USDT staking needs an existing VIP account (level 4+), so an unknown sender is
+        // refunded rather than registered at level 0 and then rejected.
+        let existingUser: User? = self.users.get(stakerAddress);
+        if (existingUser == null || existingUser!!.vipClass == 0) {
+            self.refundJettons(stakerAddress, usdtReceived, "VIP status required for staking");
+            return;
+        }
+        let user: User = existingUser!!;
 
         let minStakeUsd6: Int = self.getMinStakeInUsd6Decimals(user.vipClass);
-        require(usdtReceived >= minStakeUsd6, "Stake amount below minimum");
+        if (usdtReceived < minStakeUsd6) {
+            self.refundJettons(stakerAddress, usdtReceived, "Stake amount below minimum");
+            return;
+        }
 
         let stakeId: Int = user.stakeCounter;
         let currentTime: Int = now();
@@ -533,9 +723,9 @@ contract TonCrown with Deployable, OwnableTransferable {
             stakeId: stakeId,
             amount: usdtReceived,
             startTime: currentTime,
-            duration: payload.duration * self.SECONDS_PER_DAY,
+            duration: duration * self.SECONDS_PER_DAY,
             vipClass: user.vipClass,
-            autoRestake: payload.autoRestake,
+            autoRestake: autoRestake,
             lastClaim: currentTime,
             totalClaimed: 0,
             isActive: true,
@@ -563,20 +753,22 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.totalStakedUsdt += usdtReceived;
         self.activeStakes += 1;
 
-        send(SendParameters{
-            to: self.usdtJettonWalletAddress,
-            value: ton("0.1"),
-            mode: SendIgnoreErrors,
-            body: JettonTransfer{
-                queryId: 0,
-                amount: usdtReceived,
-                destination: self.creatorWallet3,
-                response_destination: self.owner,
-                custom_payload: null,
-                forward_ton_amount: ton("0.005"),
-                forward_payload: "USDT Staking Capital".asComment().asSlice()
-            }.toCell()
-        });
+        if (self.forwardStakeCapital) {
+            send(SendParameters{
+                to: self.usdtJettonWalletAddress,
+                value: ton("0.1"),
+                mode: SendIgnoreErrors,
+                body: JettonTransfer{
+                    queryId: 0,
+                    amount: usdtReceived,
+                    destination: self.creatorWallet3,
+                    response_destination: self.owner,
+                    custom_payload: null,
+                    forward_ton_amount: ton("0.005"),
+                    forward_payload: "USDT Staking Capital".asComment().asSlice()
+                }.toCell()
+            });
+        }
     }
 
     receive(msg: ClaimStakingRewards) {
@@ -621,6 +813,108 @@ contract TonCrown with Deployable, OwnableTransferable {
     receive(msg: SetDistributor) {
         self.requireOwner();
         self.distributorAddress = msg.address;
+    }
+
+    // isPaused was read by requireNotPaused but nothing could ever set it, so the
+    // contract had no emergency stop.
+    receive(msg: SetPaused) {
+        self.requireOwner();
+        self.isPaused = msg.paused;
+    }
+
+    receive(msg: SetStakeCapitalPolicy) {
+        self.requireOwner();
+        self.forwardStakeCapital = msg.forwardToTreasuryWallet;
+    }
+
+    // The previous deployment had no way to ship a fix. Owner-gated, and no wider than
+    // the withdrawal powers the owner already holds.
+    receive(msg: UpgradeContract) {
+        self.requireOwner();
+        setContractCode(msg.code);
+    }
+
+    //------------------------------------------------------------------
+    // MIGRATION (owner-only, until locked)
+    //------------------------------------------------------------------
+
+    receive(msg: ImportUser) {
+        self.requireOwner();
+        self.requireImportsOpen();
+        require(self.users.get(msg.userAddress) == null, "User already imported");
+
+        let imported: User = User{
+            referrer: msg.referrer,
+            level: msg.level,
+            vipClass: msg.vipClass,
+            directReferrals: msg.directReferrals,
+            totalReferrals: msg.totalReferrals,
+            otherReferrals: msg.otherReferrals,
+            lastCheckIn: msg.lastCheckIn,
+            levelExpiration: msg.levelExpiration,
+            totalEarned: msg.totalEarned,
+            isActive: msg.isActive,
+            registrationTime: msg.registrationTime,
+            stakeCounter: 0,
+            stakes: emptyMap(),
+            downlines: emptyMap(),
+            spilloverIndex: msg.spilloverIndex,
+            pendingCheckInRewards: msg.pendingCheckInRewards,
+            totalCheckInEarned: msg.totalCheckInEarned,
+            totalCheckInClaimed: msg.totalCheckInClaimed,
+            totalStakingClaimed: msg.totalStakingClaimed,
+            totalReferralEarned: msg.totalReferralEarned,
+            totalSpilloverEarned: msg.totalSpilloverEarned,
+            transactionCounter: 0,
+            transactions: emptyMap(),
+            linkReferrer: msg.linkReferrer
+        };
+
+        self.userList.set(self.totalUsers, msg.userAddress);
+        self.users.set(msg.userAddress, imported);
+        self.totalUsers = self.totalUsers + 1;
+    }
+
+    // Downlines are restored verbatim rather than replayed through the placement logic,
+    // so the imported matrix is identical to the one users already see.
+    receive(msg: ImportDownline) {
+        self.requireOwner();
+        self.requireImportsOpen();
+        let parentUser: User = self.requireUserExists(msg.parent);
+        require(self.users.get(msg.child) != null, "Child not imported");
+        parentUser.downlines.set(msg.slot, msg.child);
+        self.users.set(msg.parent, parentUser);
+    }
+
+    receive(msg: ImportStake) {
+        self.requireOwner();
+        self.requireImportsOpen();
+        let user: User = self.requireUserExists(msg.userAddress);
+        user.stakes.set(msg.stake.stakeId, msg.stake);
+        if (msg.stake.stakeId + 1 > user.stakeCounter) {
+            user.stakeCounter = msg.stake.stakeId + 1;
+        }
+        self.users.set(msg.userAddress, user);
+    }
+
+    receive(msg: ImportPlatformTotals) {
+        self.requireOwner();
+        self.requireImportsOpen();
+        self.totalStakedTon = msg.totalStakedTon;
+        self.totalStakedUsdt = msg.totalStakedUsdt;
+        self.totalDistributed = msg.totalDistributed;
+        self.activeStakes = msg.activeStakes;
+        self.totalCheckInRewardsAccrued = msg.totalCheckInRewardsAccrued;
+        self.totalCheckInRewardsClaimed = msg.totalCheckInRewardsClaimed;
+        self.totalReferralRewardsPaid = msg.totalReferralRewardsPaid;
+        self.totalSpilloverRewardsPaid = msg.totalSpilloverRewardsPaid;
+        self.totalCreatorRewardsPaid = msg.totalCreatorRewardsPaid;
+    }
+
+    // One-way. After this the owner can no longer rewrite user records.
+    receive(msg: LockImports) {
+        self.requireOwner();
+        self.importsLocked = true;
     }
 
     receive(msg: OwnerDeposit) {
@@ -690,6 +984,47 @@ contract TonCrown with Deployable, OwnableTransferable {
         require(!self.isPaused, "Contract is paused");
     }
 
+    // myBalance() already includes the value of the message being handled, so using it
+    // raw to decide whether a payout is affordable overstates the treasury by the gas
+    // the caller just attached.
+    fun availableBalance(): Int {
+        return myBalance() - context().value;
+    }
+
+    // Acknowledgement carrying no value. self.reply() must never be used from a receiver
+    // that has already spent the inbound value: reply is SendRemainingValue (mode 64),
+    // which re-attaches the full inbound message value regardless of what was sent.
+    fun confirm(to: Address, text: String) {
+        send(SendParameters{
+            to: to,
+            value: 0,
+            mode: SendIgnoreErrors,
+            bounce: false,
+            body: text.asComment()
+        });
+    }
+
+    fun requireImportsOpen() {
+        require(!self.importsLocked, "Imports are locked");
+    }
+
+    fun refundJettons(to: Address, amount: Int, reason: String) {
+        send(SendParameters{
+            to: self.usdtJettonWalletAddress,
+            value: ton("0.05"),
+            mode: SendIgnoreErrors,
+            body: JettonTransfer{
+                queryId: 0,
+                amount: amount,
+                destination: to,
+                response_destination: to,
+                custom_payload: null,
+                forward_ton_amount: ton("0.005"),
+                forward_payload: reason.asComment().asSlice()
+            }.toCell()
+        });
+    }
+
     fun requireUserExists(userAddress: Address): User {
         let userData: User? = self.users.get(userAddress);
         require(userData != null, "User not registered");
@@ -756,8 +1091,16 @@ contract TonCrown with Deployable, OwnableTransferable {
         let recipientFound: Bool = false;
 
         if (self.totalUsers > 0) {
+            // Bounded window. The scan used to run over every registered user, so gas
+            // grew linearly with the user base and UpgradeLevel eventually failed with
+            // exit code -14 for everyone.
+            let scanLimit: Int = self.MAX_SPILLOVER_SCAN;
+            if (scanLimit > self.totalUsers) {
+                scanLimit = self.totalUsers;
+            }
+
             let i: Int = 0;
-            while (i < self.totalUsers && !recipientFound) {
+            while (i < scanLimit && !recipientFound) {
                 let currentIndex: Int = (startIndex + i) % self.totalUsers;
                 let receiver: Address = self.userList.get(currentIndex)!!;
 
@@ -786,6 +1129,12 @@ contract TonCrown with Deployable, OwnableTransferable {
 
                 i = i + 1;
             }
+
+            // Nobody eligible inside this window: move the window along so the next
+            // purchase scans a different slice rather than re-walking the same dead range.
+            if (!recipientFound) {
+                self.spilloverNextIndexByBoughtLevel.set(boughtLevel, (startIndex + scanLimit) % self.totalUsers);
+            }
         }
 
         // Fallback if nobody qualifies.
@@ -806,8 +1155,15 @@ contract TonCrown with Deployable, OwnableTransferable {
             return userData!!;
         }
 
+        // A user naming themselves used to be accepted, which made them their own upline
+        // and paid them the full referral split back on every upgrade forever.
+        let linkReferrer: Address? = referrerAddress;
+        if (linkReferrer != null && linkReferrer!! == userAddress) {
+            linkReferrer = null;
+        }
+
         let newUser: User = User{
-            referrer: referrerAddress,
+            referrer: linkReferrer,
             level: 0,
             vipClass: 0,
             directReferrals: 0,
@@ -829,15 +1185,16 @@ contract TonCrown with Deployable, OwnableTransferable {
             totalReferralEarned: 0,
             totalSpilloverEarned: 0,
             transactionCounter: 0,
-            transactions: emptyMap()
+            transactions: emptyMap(),
+            linkReferrer: linkReferrer
         };
 
         self.userList.set(self.totalUsers, userAddress);
         self.users.set(userAddress, newUser);
         self.totalUsers = self.totalUsers + 1;
 
-        if (referrerAddress != null) {
-            self.processReferralRegistration(userAddress, referrerAddress!!);
+        if (linkReferrer != null) {
+            self.processReferralRegistration(userAddress, linkReferrer!!);
         }
 
         return self.users.get(userAddress)!!;
@@ -898,13 +1255,16 @@ contract TonCrown with Deployable, OwnableTransferable {
             }
         }
 
+        // Bounded breadth-first placement. An unbounded walk of the downline tree is
+        // another way for a registration to run out of gas as the matrix grows.
         let queue: map<Int, Address> = emptyMap();
         let visited: map<Address, Bool> = emptyMap();
         let queueHead: Int = 0;
         let queueTail: Int = 0;
+        let visitedCount: Int = 0;
 
         let k: Int = 1;
-        while (k <= originalReferrerUser.directReferrals) {
+        while (k <= originalReferrerUser.directReferrals && queueTail < self.MAX_PLACEMENT_SCAN) {
             let addr: Address = originalReferrerUser.downlines.get(k)!!;
             queue.set(queueTail, addr);
             visited.set(addr, true);
@@ -912,9 +1272,10 @@ contract TonCrown with Deployable, OwnableTransferable {
             k += 1;
         }
 
-        while (queueHead < queueTail) {
+        while (queueHead < queueTail && visitedCount < self.MAX_PLACEMENT_SCAN) {
             let currentAddress: Address = queue.get(queueHead)!!;
             queueHead += 1;
+            visitedCount += 1;
             let currentUser: User = self.users.get(currentAddress)!!;
 
             if (currentUser.directReferrals < self.MAX_DIRECT_REFERRALS) {
@@ -934,7 +1295,7 @@ contract TonCrown with Deployable, OwnableTransferable {
             }
 
             let j: Int = 1;
-            while (j <= currentUser.directReferrals) {
+            while (j <= currentUser.directReferrals && queueTail < self.MAX_PLACEMENT_SCAN) {
                 let nextAddr: Address = currentUser.downlines.get(j)!!;
                 if (visited.get(nextAddr) == null) {
                     visited.set(nextAddr, true);
@@ -950,9 +1311,21 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.users.set(newUser, newUserStruct);
     }
 
-    fun distributeFunds(amount: Int, payer: Address, level: Int, originalReferrer: Address?, purchaseTime: Int) {
+    fun distributeFunds(amount: Int, payer: Address, level: Int, purchaseTime: Int) {
         let user: User = self.users.get(payer)!!;
+
+        // Both referrers come from stored state. They used to be taken from the incoming
+        // message, so any caller could name an arbitrary address — their own included —
+        // and redirect the referral split to it on every upgrade.
         let actualReferrer: Address? = user.referrer;
+        let originalReferrer: Address? = user.linkReferrer;
+
+        if (actualReferrer != null && actualReferrer!! == payer) {
+            actualReferrer = null;
+        }
+        if (originalReferrer != null && originalReferrer!! == payer) {
+            originalReferrer = null;
+        }
 
         let creator1Share: Int = 0;
         let creator2Share: Int = 0;
@@ -1094,14 +1467,28 @@ contract TonCrown with Deployable, OwnableTransferable {
         let total: Int = self.calculatePendingStakeReward(currentStake, currentTime);
         require(total > 0, "No rewards yet");
 
+        // Reward and returned capital are paid inside one transaction, so affordability
+        // has to be judged against both at once. Checking them one at a time let the
+        // action phase silently drop the capital transfer (SendIgnoreErrors) after the
+        // stake had already been closed and totalStakedTon decremented — the staker's
+        // principal was destroyed.
+        let matured: Bool = currentTime >= currentStake.startTime + currentStake.duration;
+        let closingWithCapital: Bool = matured && !currentStake.autoRestake;
+
         if (currentStake.stakedAsset == self.ASSET_TON) {
             require(total > self.DISTRIBUTION_GAS_FEE, "Reward below distribution fee");
             let net: Int = total - self.DISTRIBUTION_GAS_FEE;
-            require(myBalance() >= net + self.MIN_CONTRACT_RESERVE, "Insufficient contract balance");
+
+            let tonRequired: Int = net;
+            if (closingWithCapital) {
+                tonRequired = tonRequired + currentStake.amount;
+            }
+            require(self.availableBalance() >= tonRequired + self.MIN_CONTRACT_RESERVE, "Insufficient contract balance");
+
             send(SendParameters{
                 to: userAddress,
                 value: net,
-                mode: SendIgnoreErrors,
+                mode: SendPayGasSeparately,
                 body: "TON Staking Reward".asComment()
             });
             user.totalStakingClaimed = user.totalStakingClaimed + net;
@@ -1139,17 +1526,19 @@ contract TonCrown with Deployable, OwnableTransferable {
         });
         user.transactionCounter = user.transactionCounter + 1;
 
-        if (currentTime >= currentStake.startTime + currentStake.duration) {
+        if (matured) {
             if (currentStake.autoRestake) {
                 currentStake.startTime = currentTime;
                 currentStake.lastClaim = currentTime;
             } else {
                 if (currentStake.stakedAsset == self.ASSET_TON) {
-                    require(myBalance() >= currentStake.amount + self.MIN_CONTRACT_RESERVE, "Insufficient contract balance");
+                    // Affordability was already established above against reward + capital.
+                    // No SendIgnoreErrors here: the stake is closed in the same transaction,
+                    // so a dropped action would close the position without paying it out.
                     send(SendParameters{
                         to: userAddress,
                         value: currentStake.amount,
-                        mode: SendIgnoreErrors,
+                        mode: SendPayGasSeparately,
                         body: "TON Stake Refund".asComment()
                     });
                     self.totalStakedTon -= currentStake.amount;
@@ -1448,6 +1837,177 @@ contract TonCrown with Deployable, OwnableTransferable {
             activeStakes: self.activeStakes,
             contractBalance: myBalance()
         };
+    }
+
+    //------------------------------------------------------------------
+    // ADMIN / TREASURY GETTERS
+    //
+    // These answer "how much TON does the contract need, and when". They are paginated
+    // on purpose: a getter that walked every user would grow past the get-method gas
+    // limit the same way the spillover scan did.
+    //------------------------------------------------------------------
+
+    fun buildUserSnapshot(userAddress: Address, u: User, currentTime: Int): AdminUserSnapshot {
+        let pendingTon: Int = 0;
+        let pendingUsdt: Int = 0;
+        let activeCount: Int = 0;
+        let stakedTon: Int = 0;
+        let stakedUsdt: Int = 0;
+        let maturedTon: Int = 0;
+        let maturedUsdt: Int = 0;
+
+        let i: Int = 0;
+        while (i < u.stakeCounter) {
+            let stakeOpt: StakeInfo? = u.stakes.get(i);
+            if (stakeOpt != null) {
+                let st: StakeInfo = stakeOpt!!;
+                if (st.isActive) {
+                    activeCount = activeCount + 1;
+                    let pending: Int = self.calculatePendingStakeReward(st, currentTime);
+                    let isMatured: Bool = currentTime >= st.startTime + st.duration;
+
+                    if (st.stakedAsset == self.ASSET_TON) {
+                        stakedTon = stakedTon + st.amount;
+                        pendingTon = pendingTon + pending;
+                        if (isMatured && !st.autoRestake) {
+                            maturedTon = maturedTon + st.amount;
+                        }
+                    } else {
+                        stakedUsdt = stakedUsdt + st.amount;
+                        pendingUsdt = pendingUsdt + pending;
+                        if (isMatured && !st.autoRestake) {
+                            maturedUsdt = maturedUsdt + st.amount;
+                        }
+                    }
+                }
+            }
+            i = i + 1;
+        }
+
+        return AdminUserSnapshot{
+            userAddress: userAddress,
+            level: u.level,
+            vipClass: u.vipClass,
+            isActive: u.isActive,
+            pendingCheckInRewards: u.pendingCheckInRewards,
+            pendingStakingRewardsTon: pendingTon,
+            pendingStakingRewardsUsdt: pendingUsdt,
+            activeStakeCount: activeCount,
+            activeStakedTon: stakedTon,
+            activeStakedUsdt: stakedUsdt,
+            maturedCapitalTon: maturedTon,
+            maturedCapitalUsdt: maturedUsdt,
+            tonDueNow: u.pendingCheckInRewards + pendingTon + maturedTon
+        };
+    }
+
+    get fun getAdminUserSnapshot(userAddress: Address): AdminUserSnapshot? {
+        let userOpt: User? = self.users.get(userAddress);
+        if (userOpt == null) { return null; }
+        return self.buildUserSnapshot(userAddress, userOpt!!, now());
+    }
+
+    // Page through with start = 0, limit = 50 and keep going while toIndex < totalUsers.
+    get fun getAdminUserSnapshotsPaginated(start: Int, limit: Int): map<Int, AdminUserSnapshot> {
+        let result: map<Int, AdminUserSnapshot> = emptyMap();
+        let currentTime: Int = now();
+        let end: Int = start + limit;
+        if (end > self.totalUsers) { end = self.totalUsers; }
+
+        let i: Int = start;
+        while (i < end) {
+            let addrOpt: Address? = self.userList.get(i);
+            if (addrOpt != null) {
+                let userOpt: User? = self.users.get(addrOpt!!);
+                if (userOpt != null) {
+                    result.set(i, self.buildUserSnapshot(addrOpt!!, userOpt!!, currentTime));
+                }
+            }
+            i = i + 1;
+        }
+        return result;
+    }
+
+    // Same page window, aggregated. Sum tonDueNow across pages to get the amount the
+    // contract must hold right now to satisfy every claim that is already claimable.
+    get fun getTreasuryLiabilities(start: Int, limit: Int): TreasuryLiabilities {
+        let currentTime: Int = now();
+        let end: Int = start + limit;
+        if (end > self.totalUsers) { end = self.totalUsers; }
+
+        let scanned: Int = 0;
+        let checkIn: Int = 0;
+        let pendingTon: Int = 0;
+        let pendingUsdt: Int = 0;
+        let maturedTon: Int = 0;
+        let maturedUsdt: Int = 0;
+        let stakedTon: Int = 0;
+        let stakedUsdt: Int = 0;
+        let activeCount: Int = 0;
+
+        let i: Int = start;
+        while (i < end) {
+            let addrOpt: Address? = self.userList.get(i);
+            if (addrOpt != null) {
+                let userOpt: User? = self.users.get(addrOpt!!);
+                if (userOpt != null) {
+                    let snap: AdminUserSnapshot = self.buildUserSnapshot(addrOpt!!, userOpt!!, currentTime);
+                    scanned = scanned + 1;
+                    checkIn = checkIn + snap.pendingCheckInRewards;
+                    pendingTon = pendingTon + snap.pendingStakingRewardsTon;
+                    pendingUsdt = pendingUsdt + snap.pendingStakingRewardsUsdt;
+                    maturedTon = maturedTon + snap.maturedCapitalTon;
+                    maturedUsdt = maturedUsdt + snap.maturedCapitalUsdt;
+                    stakedTon = stakedTon + snap.activeStakedTon;
+                    stakedUsdt = stakedUsdt + snap.activeStakedUsdt;
+                    activeCount = activeCount + snap.activeStakeCount;
+                }
+            }
+            i = i + 1;
+        }
+
+        return TreasuryLiabilities{
+            fromIndex: start,
+            toIndex: end,
+            usersScanned: scanned,
+            pendingCheckInRewards: checkIn,
+            pendingStakingRewardsTon: pendingTon,
+            pendingStakingRewardsUsdt: pendingUsdt,
+            maturedCapitalTon: maturedTon,
+            maturedCapitalUsdt: maturedUsdt,
+            activeStakedTon: stakedTon,
+            activeStakedUsdt: stakedUsdt,
+            activeStakeCount: activeCount,
+            tonDueNow: checkIn + pendingTon + maturedTon
+        };
+    }
+
+    get fun getTreasuryStatus(): TreasuryStatus {
+        return TreasuryStatus{
+            contractBalance: myBalance(),
+            minReserve: self.MIN_CONTRACT_RESERVE,
+            totalUsers: self.totalUsers,
+            unclaimedCheckInRewards: self.totalCheckInRewardsAccrued - self.totalCheckInRewardsClaimed,
+            totalStakedTon: self.totalStakedTon,
+            totalStakedUsdt: self.totalStakedUsdt,
+            activeStakes: self.activeStakes,
+            isPaused: self.isPaused,
+            importsLocked: self.importsLocked,
+            forwardStakeCapital: self.forwardStakeCapital
+        };
+    }
+
+    get fun getUserListPaginated(start: Int, limit: Int): map<Int, Address> {
+        let result: map<Int, Address> = emptyMap();
+        let end: Int = start + limit;
+        if (end > self.totalUsers) { end = self.totalUsers; }
+        let i: Int = start;
+        while (i < end) {
+            let addrOpt: Address? = self.userList.get(i);
+            if (addrOpt != null) { result.set(i, addrOpt!!); }
+            i = i + 1;
+        }
+        return result;
     }
 
     get fun getUserTransaction(userAddress: Address, txId: Int): UserTransaction? {

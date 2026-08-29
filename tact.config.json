@@ -3,8 +3,8 @@
   "projects": [
     {
       "name": "TonCrown",
-      "path": "contracts\\ton_crown.tact",
-      "output": "build\\TonCrown",
+      "path": "contracts/ton_crown.tact",
+      "output": "build/TonCrown",
       "options": {
         "debug": false,
         "external": false
