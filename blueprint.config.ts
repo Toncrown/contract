@@ -1,21 +1,29 @@
 import { mnemonicToWalletKey } from '@ton/crypto';
-import { WalletContractV4 } from '@ton/ton';
+import { WalletContractV4, WalletContractV5R1 } from '@ton/ton';
 
 const getNetwork = async (endpoint: string) => {
-    const mnemonic = process.env.MNEMONIC?.split(' ');
+    const mnemonic = process.env.MNEMONIC?.trim().split(/\s+/);
 
-    if (!mnemonic || mnemonic.length !== 12) {
+    // TON's standard mnemonic is 24 words; 12-word phrases exist but are the exception.
+    // Rejecting anything but 12 meant a normal Tonkeeper/Tonhub phrase was refused.
+    if (!mnemonic || (mnemonic.length !== 24 && mnemonic.length !== 12)) {
         throw new Error(
-            'Please set a valid 12-word MNEMONIC in your environment variables.'
+            `Set MNEMONIC to your wallet's 24-word (or 12-word) recovery phrase. ` +
+            `Got ${mnemonic ? mnemonic.length : 0} word(s).`
         );
     }
 
     const key = await mnemonicToWalletKey(mnemonic);
 
-    const wallet = WalletContractV4.create({
-        workchain: 0,
-        publicKey: key.publicKey,
-    });
+    // The wallet version decides the derived address. Deriving v4 for a wallet that is
+    // actually v5R1 silently produces a different address, which for this project means
+    // signing as something other than the contract owner. Run `blueprint run preflight`
+    // to confirm the derived address before sending anything.
+    const version = (process.env.WALLET_VERSION ?? 'v4').toLowerCase();
+    const wallet =
+        version === 'v5' || version === 'v5r1'
+            ? WalletContractV5R1.create({ workchain: 0, publicKey: key.publicKey })
+            : WalletContractV4.create({ workchain: 0, publicKey: key.publicKey });
 
     return {
         endpoint,
