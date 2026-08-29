@@ -3,27 +3,21 @@
  *
  *   npx blueprint run exportState
  *
- * Set OLD_CONTRACT in .env (or pass it when prompted). Writes migration-snapshot.json.
+ * Set OLD_CONTRACT in .env. Writes migration-snapshot.json. Read-only.
+ * EXPORT_LIMIT=n exports only the first n users as a smoke test; snapshots taken
+ * that way are marked partial and importState refuses them.
  *
- * This talks to the old contract through raw get-method calls and reads the result
- * tuples by position, because the old contract predates the `linkReferrer` field and
- * the generated wrapper from this build would mis-parse its User struct.
+ * Parsing is done by the wrapper generated from contracts/legacy_v1.tact, which is
+ * the deployed source verbatim. Hand-parsing the getUserInfo tuple by position does
+ * not work: User has 23 fields, and Tact splits a struct past 14 fields into a
+ * nested tuple, so everything from spilloverIndex onward sits one level down.
  */
-import { Address, TupleReader, beginCell } from '@ton/core';
+import { Address, Dictionary } from '@ton/core';
 import { NetworkProvider, sleep } from '@ton/blueprint';
+import { TonCrown as TonCrownV1 } from '../build/TonCrownV1/TonCrownV1_TonCrown';
 import * as fs from 'fs';
 
 export const SNAPSHOT_FILE = 'migration-snapshot.json';
-
-// Field order of the OLD contract's User struct, as returned by getUserInfo.
-const U = {
-    referrer: 0, level: 1, vipClass: 2, directReferrals: 3, totalReferrals: 4,
-    otherReferrals: 5, lastCheckIn: 6, levelExpiration: 7, totalEarned: 8,
-    isActive: 9, registrationTime: 10, stakeCounter: 11, /* 12 stakes, 13 downlines */
-    spilloverIndex: 14, pendingCheckInRewards: 15, totalCheckInEarned: 16,
-    totalCheckInClaimed: 17, totalStakingClaimed: 18, totalReferralEarned: 19,
-    totalSpilloverEarned: 20, transactionCounter: 21,
-};
 
 export type SnapshotStake = {
     stakeId: string; amount: string; startTime: string; duration: string;
@@ -41,6 +35,8 @@ export type SnapshotUser = {
     isActive: boolean; registrationTime: string; spilloverIndex: string;
     pendingCheckInRewards: string; totalCheckInEarned: string; totalCheckInClaimed: string;
     totalStakingClaimed: string; totalReferralEarned: string; totalSpilloverEarned: string;
+    /** slot -> child address, exactly as the old contract stored it */
+    downlines: Record<string, string>;
     stakes: SnapshotStake[];
 };
 
@@ -54,50 +50,35 @@ export type Snapshot = {
     users: SnapshotUser[];
 };
 
-// toncenter's free tier is roughly one request per second; back off and retry rather
-// than dropping a user out of the snapshot.
-async function call(provider: NetworkProvider, addr: Address, method: string, args: any[] = []): Promise<TupleReader> {
+// toncenter's free tier is roughly one request per second, and times out under load.
+// Back off and retry rather than dropping a user out of the snapshot.
+async function retry<T>(label: string, fn: () => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
         try {
-            const res = await provider.provider(addr).get(method as any, args as any);
+            const out = await fn();
             await sleep(1100);
-            return res.stack;
+            return out;
         } catch (e) {
-            if (attempt >= 5) throw new Error(`${method} failed after 6 attempts: ${e}`);
+            if (attempt >= 5) throw new Error(`${label} failed after 6 attempts: ${e}`);
             const wait = 2000 * 2 ** attempt;
-            console.log(`   ${method} failed (${e}); retrying in ${wait / 1000}s`);
+            console.log(`   ${label} failed (${(e as Error).message ?? e}); retrying in ${wait / 1000}s`);
             await sleep(wait);
         }
     }
 }
 
-const addrArg = (a: Address) => [{ type: 'slice' as const, cell: beginCell().storeAddress(a).endCell() }];
-
 export async function run(provider: NetworkProvider) {
     const oldAddress = Address.parse(
         process.env.OLD_CONTRACT ?? (await provider.ui().input('Old contract address')),
     );
+    const c = provider.open(TonCrownV1.fromAddress(oldAddress));
 
     console.log(`Reading ${oldAddress.toString()}\n`);
 
-    const stats = await call(provider, oldAddress, 'getPlatformStats');
-    const platform = {
-        totalUsers: stats.readBigNumber().toString(),
-        totalStakedTon: stats.readBigNumber().toString(),
-        totalStakedUsdt: stats.readBigNumber().toString(),
-        totalDistributed: stats.readBigNumber().toString(),
-        activeStakes: stats.readBigNumber().toString(),
-    };
+    const stats = await retry('getPlatformStats', () => c.getGetPlatformStats());
+    const earnings = await retry('getPlatformEarningsInfo', () => c.getGetPlatformEarningsInfo());
 
-    const earnings = await call(provider, oldAddress, 'getPlatformEarningsInfo');
-    earnings.readBigNumber(); earnings.readBigNumber(); earnings.readBigNumber(); earnings.readBigNumber();
-    const totalCheckInRewardsAccrued = earnings.readBigNumber().toString();
-    const totalCheckInRewardsClaimed = earnings.readBigNumber().toString();
-    const totalReferralRewardsPaid = earnings.readBigNumber().toString();
-    const totalSpilloverRewardsPaid = earnings.readBigNumber().toString();
-    const totalCreatorRewardsPaid = earnings.readBigNumber().toString();
-
-    let totalUsers = Number(platform.totalUsers);
+    let totalUsers = Number(stats.totalUsers);
     const limit = process.env.EXPORT_LIMIT ? Number(process.env.EXPORT_LIMIT) : 0;
     if (limit > 0 && limit < totalUsers) {
         console.log(`EXPORT_LIMIT=${limit} — smoke test only, NOT a complete snapshot\n`);
@@ -107,71 +88,54 @@ export async function run(provider: NetworkProvider) {
 
     const users: SnapshotUser[] = [];
     for (let i = 0; i < totalUsers; i++) {
-        const addrStack = await call(provider, oldAddress, 'getUserAddressByIndex', [{ type: 'int', value: BigInt(i) }]);
-        const address = addrStack.readAddressOpt();
+        const address = await retry(`getUserAddressByIndex(${i})`, () => c.getGetUserAddressByIndex(BigInt(i)));
         if (address === null) {
             console.log(`   [${i}] empty slot, skipping`);
             continue;
         }
 
-        const info = (await call(provider, oldAddress, 'getUserInfo', addrArg(address))).readTupleOpt();
-        if (info === null) {
-            console.log(`   [${i}] ${address.toString().slice(0, 12)}… in userList but getUserInfo returned null — skipping`);
+        const u = await retry(`getUserInfo(${i})`, () => c.getGetUserInfo(address));
+        if (u === null) {
+            console.log(`   [${i}] ${address.toString().slice(0, 12)}… in userList but getUserInfo is null — skipping`);
             continue;
         }
-        const items: any[] = [];
-        while (info.remaining > 0) items.push(info.pop());
 
-        const num = (k: number) => (items[k]?.value ?? 0n).toString();
-        const bool = (k: number) => (items[k]?.value ?? 0n) === -1n;
-        const addr = (k: number) => {
-            const it = items[k];
-            if (!it || it.type === 'null') return null;
-            try { return it.cell.beginParse().loadAddressAny()?.toString() ?? null; } catch { return null; }
-        };
-
-        // Stakes come from the dedicated getters rather than the raw map cell.
+        // stakes and downlines come back as parsed dictionaries, so no extra calls.
         const stakes: SnapshotStake[] = [];
-        const stakeCounter = Number(num(U.stakeCounter));
-        for (let sid = 0; sid < stakeCounter; sid++) {
-            const st = await call(provider, oldAddress, 'getStakeDetails',
-                [...addrArg(address), { type: 'int', value: BigInt(sid) }]);
-            const t = st.readTupleOpt();
-            if (t === null) continue;
+        for (const [id, s] of u.stakes) {
             stakes.push({
-                stakeId: t.readBigNumber().toString(),
-                amount: t.readBigNumber().toString(),
-                startTime: t.readBigNumber().toString(),
-                duration: t.readBigNumber().toString(),
-                vipClass: t.readBigNumber().toString(),
-                autoRestake: t.readBoolean(),
-                lastClaim: t.readBigNumber().toString(),
-                totalClaimed: t.readBigNumber().toString(),
-                isActive: t.readBoolean(),
-                stakedAsset: t.readBigNumber().toString(),
+                stakeId: id.toString(), amount: s.amount.toString(),
+                startTime: s.startTime.toString(), duration: s.duration.toString(),
+                vipClass: s.vipClass.toString(), autoRestake: s.autoRestake,
+                lastClaim: s.lastClaim.toString(), totalClaimed: s.totalClaimed.toString(),
+                isActive: s.isActive, stakedAsset: s.stakedAsset.toString(),
             });
         }
+        stakes.sort((a, b) => Number(a.stakeId) - Number(b.stakeId));
+
+        const downlines: Record<string, string> = {};
+        for (const [slot, child] of u.downlines) downlines[slot.toString()] = child.toString();
 
         users.push({
             index: i,
             address: address.toString(),
-            referrer: addr(U.referrer),
-            level: num(U.level), vipClass: num(U.vipClass),
-            directReferrals: num(U.directReferrals), totalReferrals: num(U.totalReferrals),
-            otherReferrals: num(U.otherReferrals), lastCheckIn: num(U.lastCheckIn),
-            levelExpiration: num(U.levelExpiration), totalEarned: num(U.totalEarned),
-            isActive: bool(U.isActive), registrationTime: num(U.registrationTime),
-            spilloverIndex: num(U.spilloverIndex),
-            pendingCheckInRewards: num(U.pendingCheckInRewards),
-            totalCheckInEarned: num(U.totalCheckInEarned),
-            totalCheckInClaimed: num(U.totalCheckInClaimed),
-            totalStakingClaimed: num(U.totalStakingClaimed),
-            totalReferralEarned: num(U.totalReferralEarned),
-            totalSpilloverEarned: num(U.totalSpilloverEarned),
-            stakes,
+            referrer: u.referrer ? u.referrer.toString() : null,
+            level: u.level.toString(), vipClass: u.vipClass.toString(),
+            directReferrals: u.directReferrals.toString(), totalReferrals: u.totalReferrals.toString(),
+            otherReferrals: u.otherReferrals.toString(), lastCheckIn: u.lastCheckIn.toString(),
+            levelExpiration: u.levelExpiration.toString(), totalEarned: u.totalEarned.toString(),
+            isActive: u.isActive, registrationTime: u.registrationTime.toString(),
+            spilloverIndex: u.spilloverIndex.toString(),
+            pendingCheckInRewards: u.pendingCheckInRewards.toString(),
+            totalCheckInEarned: u.totalCheckInEarned.toString(),
+            totalCheckInClaimed: u.totalCheckInClaimed.toString(),
+            totalStakingClaimed: u.totalStakingClaimed.toString(),
+            totalReferralEarned: u.totalReferralEarned.toString(),
+            totalSpilloverEarned: u.totalSpilloverEarned.toString(),
+            downlines, stakes,
         });
 
-        console.log(`   [${i + 1}/${totalUsers}] ${address.toString().slice(0, 12)}…  level ${num(U.level)}  ${stakes.length} stake(s)`);
+        console.log(`   [${i + 1}/${totalUsers}] ${address.toString().slice(0, 12)}…  level ${u.level}  ${stakes.length} stake(s)  ${Object.keys(downlines).length} downline(s)`);
     }
 
     const snapshot: Snapshot = {
@@ -180,9 +144,16 @@ export async function run(provider: NetworkProvider) {
         partial: limit > 0,
         totalUsers: users.length,
         platform: {
-            ...platform,
-            totalCheckInRewardsAccrued, totalCheckInRewardsClaimed,
-            totalReferralRewardsPaid, totalSpilloverRewardsPaid, totalCreatorRewardsPaid,
+            totalUsers: stats.totalUsers.toString(),
+            totalStakedTon: stats.totalStakedTon.toString(),
+            totalStakedUsdt: stats.totalStakedUsdt.toString(),
+            totalDistributed: stats.totalDistributed.toString(),
+            activeStakes: stats.activeStakes.toString(),
+            totalCheckInRewardsAccrued: earnings.totalCheckInRewardsAccrued.toString(),
+            totalCheckInRewardsClaimed: earnings.totalCheckInRewardsClaimed.toString(),
+            totalReferralRewardsPaid: earnings.totalReferralRewardsPaid.toString(),
+            totalSpilloverRewardsPaid: earnings.totalSpilloverRewardsPaid.toString(),
+            totalCreatorRewardsPaid: earnings.totalCreatorRewardsPaid.toString(),
         },
         users,
     };
@@ -191,21 +162,31 @@ export async function run(provider: NetworkProvider) {
 
     const withStakes = users.filter((u) => u.stakes.length > 0).length;
     const pendingCheckIn = users.reduce((a, u) => a + BigInt(u.pendingCheckInRewards), 0n);
+    const stakedTon = users.reduce((a, u) =>
+        a + u.stakes.filter((s) => s.isActive && s.stakedAsset === '0').reduce((b, s) => b + BigInt(s.amount), 0n), 0n);
+
     console.log(`\nWrote ${SNAPSHOT_FILE}`);
-    console.log(`   users: ${users.length}   with stakes: ${withStakes}`);
-    console.log(`   unclaimed check-in rewards: ${Number(pendingCheckIn) / 1e9} TON`);
-    if (users.length !== totalUsers) {
-        console.log(`\n   WARNING: expected ${totalUsers} users but exported ${users.length}. Do not import until this is understood.`);
-    }
+    console.log(`   users:                       ${users.length}`);
+    console.log(`   with stakes:                 ${withStakes}`);
+    console.log(`   active staked TON (summed):  ${Number(stakedTon) / 1e9}`);
+    console.log(`   contract totalStakedTon:     ${Number(stats.totalStakedTon) / 1e9}`);
+    console.log(`   unclaimed check-in rewards:  ${Number(pendingCheckIn) / 1e9} TON`);
+
     if (limit > 0) {
         console.log(`\n   PARTIAL SNAPSHOT (EXPORT_LIMIT=${limit}). Re-run without EXPORT_LIMIT before importing.`);
+    } else {
+        if (users.length !== Number(stats.totalUsers)) {
+            console.log(`\n   WARNING: contract reports ${stats.totalUsers} users, exported ${users.length}.`);
+        }
+        if (stakedTon !== stats.totalStakedTon) {
+            console.log(`\n   NOTE: summed active TON stakes (${Number(stakedTon) / 1e9}) != totalStakedTon (${Number(stats.totalStakedTon) / 1e9}).`);
+            console.log(`   Expected if any stake was closed without the counter being decremented; worth understanding before cutover.`);
+        }
     }
 
-    // Cheap sanity check that the tuple positions actually lined up.
-    const odd = users.filter((u) => Number(u.level) < 0 || Number(u.level) > 10 || Number(u.registrationTime) <= 0);
+    const odd = users.filter((u) => Number(u.registrationTime) <= 0);
     if (odd.length > 0) {
-        console.log(`\n   ${odd.length} user(s) have an implausible level or registrationTime.`);
-        console.log(`   That usually means the getUserInfo tuple layout differs from what this script assumes.`);
-        odd.slice(0, 5).forEach((u) => console.log(`      ${u.address}  level=${u.level} regTime=${u.registrationTime}`));
+        console.log(`\n   ${odd.length} user(s) have registrationTime 0:`);
+        odd.slice(0, 5).forEach((u) => console.log(`      ${u.address}  level=${u.level}`));
     }
 }

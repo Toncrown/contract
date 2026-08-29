@@ -39,22 +39,24 @@ const linkReferrerFor = (u: SnapshotUser) =>
     process.env.MIGRATE_LINK_REFERRER === 'none' ? null : u.referrer;
 
 /**
- * Downlines are rebuilt from each user's `referrer`, in registration order. The old
- * contract assigned slots by incrementing directReferrals as children attached, so
- * registration order reproduces the original slot numbering exactly.
+ * The snapshot carries each parent's actual `downlines` map, read straight off the old
+ * contract, so the matrix is copied slot for slot rather than inferred. A child that is
+ * not itself in the snapshot is skipped, because ImportDownline requires both sides.
  */
-function rebuildDownlines(users: SnapshotUser[]) {
+function collectDownlines(users: SnapshotUser[]) {
     const known = new Set(users.map((u) => u.address));
-    const bySlot: { parent: string; slot: number; child: string }[] = [];
-    const nextSlot = new Map<string, number>();
+    const links: { parent: string; slot: number; child: string }[] = [];
 
     for (const u of [...users].sort((a, b) => a.index - b.index)) {
-        if (!u.referrer || !known.has(u.referrer)) continue;   // creatorWallet3 fallback, or unregistered
-        const slot = (nextSlot.get(u.referrer) ?? 0) + 1;
-        nextSlot.set(u.referrer, slot);
-        bySlot.push({ parent: u.referrer, slot, child: u.address });
+        for (const [slot, child] of Object.entries(u.downlines)) {
+            if (!known.has(child)) {
+                console.log(`   skipping ${u.address.slice(0, 10)}…[${slot}] -> ${child.slice(0, 10)}… (child not in snapshot)`);
+                continue;
+            }
+            links.push({ parent: u.address, slot: Number(slot), child });
+        }
     }
-    return bySlot;
+    return links;
 }
 
 export async function run(provider: NetworkProvider) {
@@ -72,7 +74,7 @@ export async function run(provider: NetworkProvider) {
 
     const progress = loadProgress();
     const users = [...snap.users].sort((a, b) => a.index - b.index);
-    const downlines = rebuildDownlines(users);
+    const downlines = collectDownlines(users);
     const stakes = users.flatMap((u) => u.stakes.map((s) => ({ user: u.address, stake: s })));
 
     console.log(`Importing into ${newAddress.toString()}`);
