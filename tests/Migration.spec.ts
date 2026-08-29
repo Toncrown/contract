@@ -1,6 +1,7 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { toNano, Address } from '@ton/core';
 import { TonCrown } from '../build/TonCrown/TonCrown_TonCrown';
+import { TonCrown as TonCrownV1 } from '../build/TonCrownV1/TonCrownV1_TonCrown';
 import '@ton/test-utils';
 
 const COSTS = ['0', '1.25', '2.51', '3.77', '5.03', '6.27', '7.53', '8.78', '10.04', '11.29', '12.55'];
@@ -22,10 +23,51 @@ describe('migration', () => {
         owner = await bc.treasury('owner');
     });
 
+    // The deployed contract is V1. Reading it with the V2 wrapper silently misparses:
+    // User has 23 fields and Tact nests everything past the 14th in a sub-tuple, so
+    // exportState must use the wrapper generated from the V1 source.
+    it('reads a real V1 contract the way exportState does', async () => {
+        const v1 = bc.openContract(await TonCrownV1.fromInit(owner.address));
+        await v1.send(owner.getSender(), { value: toNano('0.5') }, { $$type: 'Deploy', queryId: 0n });
+        await owner.send({ to: v1.address, value: toNano('500'), bounce: false });
+
+        const a = await bc.treasury('v1a');
+        const b = await bc.treasury('v1b');
+        for (let l = 1; l <= 5; l++)
+            await v1.send(a.getSender(), { value: toNano(COSTS[l]) + toNano('0.05') },
+                { $$type: 'UpgradeLevel', targetLevel: BigInt(l), referrerAddress: null });
+        bc.now! += 5;
+        await v1.send(b.getSender(), { value: toNano(COSTS[1]) + toNano('0.05') },
+            { $$type: 'UpgradeLevel', targetLevel: 1n, referrerAddress: a.address });
+        await v1.send(a.getSender(), { value: toNano('7') + toNano('0.03') },
+            { $$type: 'StakeTON', duration: 21n, autoRestake: false, referrerAddress: null });
+        await v1.send(a.getSender(), { value: toNano('0.05') }, { $$type: 'CheckIn' });
+
+        const info = (await v1.getGetUserInfo(a.address))!;
+
+        // the fields the old hand-rolled positional parser got wrong
+        expect(info.level).toBe(5n);
+        expect(Number(info.registrationTime)).toBeGreaterThan(0);
+        expect(info.vipClass).toBe(1n);
+        // spilloverIndex onward live in the nested tuple
+        expect(info.pendingCheckInRewards).toBe(toNano('0.01'));
+        expect(info.stakeCounter).toBe(1n);
+        expect(info.stakes.get(0n)!.amount).toBe(toNano('7'));
+
+        // matrix comes back as a parsed dictionary, no extra calls needed
+        expect(info.downlines.get(1n)!.toString()).toBe(b.address.toString());
+
+        const bi = (await v1.getGetUserInfo(b.address))!;
+        expect(bi.referrer!.toString()).toBe(a.address.toString());
+        expect(Number(bi.registrationTime)).toBeGreaterThan(0);
+    });
+
     it('carries every user, matrix link and stake across to a new contract', async () => {
-        // ---- build a source contract with a real referral tree and stakes
-        const src = await fresh();
-        const upgrade = (c: SandboxContract<TonCrown>, u: SandboxContract<TreasuryContract>, l: number, ref: Address | null = null) =>
+        // ---- build a V1 source contract with a real referral tree and stakes
+        const src = bc.openContract(await TonCrownV1.fromInit(owner.address));
+        await src.send(owner.getSender(), { value: toNano('0.5') }, { $$type: 'Deploy', queryId: 0n });
+        await owner.send({ to: src.address, value: toNano('2000'), bounce: false });
+        const upgrade = (c: any, u: SandboxContract<TreasuryContract>, l: number, ref: Address | null = null) =>
             c.send(u.getSender(), { value: toNano(COSTS[l]) + toNano('0.05') },
                 { $$type: 'UpgradeLevel', targetLevel: BigInt(l), referrerAddress: ref });
 
@@ -52,12 +94,10 @@ describe('migration', () => {
         for (let i = 0; i < total; i++) {
             const addr = (await src.getGetUserAddressByIndex(BigInt(i)))!;
             const info = (await src.getGetUserInfo(addr))!;
-            const stakes: any[] = [];
-            for (let sid = 0; sid < Number(info.stakeCounter); sid++) {
-                const sd = await src.getGetStakeDetails(addr, BigInt(sid));
-                if (sd) stakes.push(sd);
-            }
-            exported.push({ index: i, addr, info, stakes });
+            const stakes = [...info.stakes].map(([id, s]) => ({ ...s, stakeId: id }))
+                .sort((x, y) => Number(x.stakeId) - Number(y.stakeId));
+            const downlines = [...info.downlines].map(([slot, child]) => ({ slot, child }));
+            exported.push({ index: i, addr, info, stakes, downlines });
         }
         expect(exported.length).toBe(9);
 
@@ -84,18 +124,16 @@ describe('migration', () => {
             });
         }
 
-        // downlines rebuilt from referrer in registration order (mirrors the script)
+        // matrix copied slot for slot from the snapshot (mirrors the script)
         const known = new Set(exported.map((e) => e.addr.toString()));
-        const nextSlot = new Map<string, number>();
         let links = 0;
         for (const e of exported) {
-            const ref = e.info.referrer?.toString();
-            if (!ref || !known.has(ref)) continue;
-            const slot = (nextSlot.get(ref) ?? 0) + 1;
-            nextSlot.set(ref, slot);
-            await dst.send(owner.getSender(), { value: toNano('0.05') },
-                { $$type: 'ImportDownline', parent: Address.parse(ref), slot: BigInt(slot), child: e.addr });
-            links++;
+            for (const d of e.downlines) {
+                if (!known.has(d.child.toString())) continue;
+                await dst.send(owner.getSender(), { value: toNano('0.05') },
+                    { $$type: 'ImportDownline', parent: e.addr, slot: d.slot, child: d.child });
+                links++;
+            }
         }
         expect(links).toBeGreaterThan(0);
 

@@ -10,6 +10,16 @@
         "external": false
       },
       "mode": "full"
+    },
+    {
+      "name": "TonCrownV1",
+      "path": "contracts/legacy_v1.tact",
+      "output": "build/TonCrownV1",
+      "options": {
+        "debug": false,
+        "external": false
+      },
+      "mode": "full"
     }
   ]
 }
