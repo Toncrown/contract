@@ -19,12 +19,39 @@ const PROGRESS_FILE = 'migration-progress.json';
 const GAS = toNano('0.05');
 const PAUSE_MS = 2500;
 
-type Progress = { users: string[]; downlines: string[]; stakes: string[]; totals: boolean };
+type Progress = {
+    /** Which contract this progress belongs to. */
+    contract: string;
+    /** Which snapshot it was taken from. */
+    snapshotBlock: number;
+    users: string[]; downlines: string[]; stakes: string[]; totals: boolean;
+};
 
-const loadProgress = (): Progress =>
-    fs.existsSync(PROGRESS_FILE)
-        ? JSON.parse(fs.readFileSync(PROGRESS_FILE, 'utf8'))
-        : { users: [], downlines: [], stakes: [], totals: false };
+const emptyProgress = (contract: string, snapshotBlock: number): Progress =>
+    ({ contract, snapshotBlock, users: [], downlines: [], stakes: [], totals: false });
+
+/**
+ * Progress is scoped to a target contract and snapshot. Without that, a testnet
+ * rehearsal would leave every user marked done, and the following mainnet run would
+ * skip all of them and report success against an empty contract.
+ */
+function loadProgress(contract: string, snapshotBlock: number): Progress {
+    if (!fs.existsSync(PROGRESS_FILE)) return emptyProgress(contract, snapshotBlock);
+
+    const prev = JSON.parse(fs.readFileSync(PROGRESS_FILE, 'utf8')) as Partial<Progress>;
+    if (prev.contract !== contract) {
+        console.log(`Progress file belongs to ${prev.contract ?? 'an older run'}, not ${contract} — starting fresh.\n`);
+        return emptyProgress(contract, snapshotBlock);
+    }
+    if (prev.snapshotBlock !== snapshotBlock) {
+        throw new Error(
+            `${PROGRESS_FILE} was written for a snapshot at block ${prev.snapshotBlock}, but ` +
+            `${SNAPSHOT_FILE} is from block ${snapshotBlock}. Resuming across two different ` +
+            `snapshots would mix data. Delete ${PROGRESS_FILE} to start this contract over.`,
+        );
+    }
+    return { ...emptyProgress(contract, snapshotBlock), ...prev } as Progress;
+}
 
 const saveProgress = (p: Progress) => fs.writeFileSync(PROGRESS_FILE, JSON.stringify(p, null, 2));
 
@@ -74,12 +101,13 @@ export async function run(provider: NetworkProvider) {
     if (status.importsLocked) throw new Error('Imports are locked on this contract — nothing can be written');
     if (snap.partial) throw new Error('This snapshot was taken with EXPORT_LIMIT set and is incomplete. Re-run exportState without it.');
 
-    const progress = loadProgress();
+    const progress = loadProgress(newAddress.toString(), snap.blockSeqno);
     const users = [...snap.users].sort((a, b) => a.index - b.index);
     const downlines = collectDownlines(users);
     const stakes = users.flatMap((u) => u.stakes.map((s) => ({ user: u.address, stake: s })));
 
-    console.log(`Importing into ${newAddress.toString()}`);
+    console.log(`Importing into ${newAddress.toString()} on ${provider.network()}`);
+    console.log(`   snapshot from ${snap.oldContract} at block ${snap.blockSeqno}`);
     console.log(`   ${users.length} users, ${downlines.length} downline links, ${stakes.length} stakes`);
     console.log(`   already done: ${progress.users.length} / ${progress.downlines.length} / ${progress.stakes.length}\n`);
 
