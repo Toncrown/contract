@@ -8,6 +8,7 @@
  */
 import { Address, Cell, TupleBuilder, TupleItem } from '@ton/core';
 import { NetworkProvider } from '@ton/blueprint';
+import { pinnedReader, accountCodeHash } from './lib/readClient';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -55,10 +56,11 @@ export async function run(provider: NetworkProvider) {
         process.env.OLD_CONTRACT ?? (await provider.ui().input('Old contract address')),
     );
 
-    const state = await provider.provider(old).getState();
-    if (state.state.type !== 'active') throw new Error('Contract is not active');
-    const onChain = Cell.fromBoc(state.state.code!)[0].hash().toString('hex');
+    const reader = await pinnedReader(provider);
+    const onChain = await accountCodeHash(reader, old);
+    if (!onChain) throw new Error('Contract is not active');
 
+    console.log(`reading via ${reader.endpoint} at block ${reader.seqno}`);
     console.log(`on-chain code hash: ${onChain}\n`);
 
     let matched: string | null = null;
@@ -78,15 +80,15 @@ export async function run(provider: NetworkProvider) {
     const idx = Number(process.env.INSPECT_INDEX ?? '0');
     const b0 = new TupleBuilder();
     b0.writeNumber(BigInt(idx));
-    const addrStack = (await provider.provider(old).get('getUserAddressByIndex' as any, b0.build())).stack;
-    const userAddr = addrStack.readAddressOpt();
+    const addrRes = await reader.client.runMethod(reader.seqno, old, 'getUserAddressByIndex', b0.build());
+    const userAddr = addrRes.reader.readAddressOpt();
     if (!userAddr) { console.log(`\nNo user at index ${idx}`); return; }
 
     console.log(`\ngetUserInfo raw stack for user[${idx}] ${userAddr.toString()}:`);
     const b1 = new TupleBuilder();
     b1.writeAddress(userAddr);
-    const res = await provider.provider(old).get('getUserInfo' as any, b1.build());
-    const items: TupleItem[] = (res.stack as any).items ?? [];
+    const res = await reader.client.runMethod(reader.seqno, old, 'getUserInfo', b1.build());
+    const items: TupleItem[] = (res.reader as any).items ?? [];
     console.log(`  stack has ${items.length} item(s)`);
     items.forEach((it, i) => console.log(`  [${i}]\n${describe(it, 1)}`));
 }

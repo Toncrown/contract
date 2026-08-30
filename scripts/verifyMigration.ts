@@ -8,6 +8,7 @@
 import { Address, fromNano } from '@ton/core';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 import { TonCrown } from '../build/TonCrown/TonCrown_TonCrown';
+import { pinnedReader } from './lib/readClient';
 import { Snapshot, SNAPSHOT_FILE } from './exportState';
 import * as fs from 'fs';
 
@@ -16,12 +17,15 @@ export async function run(provider: NetworkProvider) {
     const newAddress = Address.parse(
         process.env.NEW_CONTRACT ?? (await provider.ui().input('New contract address')),
     );
-    const c = provider.open(TonCrown.fromAddress(newAddress));
+    // Same nested-tuple problem applies to the new contract's User, which is larger still.
+    const reader = await pinnedReader(provider);
+    const c = reader.open(TonCrown.fromAddress(newAddress));
 
     const problems: string[] = [];
     const check = (ok: boolean, msg: string) => { if (!ok) problems.push(msg); };
 
-    console.log(`Verifying ${newAddress.toString()} against ${SNAPSHOT_FILE}\n`);
+    console.log(`Verifying ${newAddress.toString()} against ${SNAPSHOT_FILE}`);
+    console.log(`   via ${reader.endpoint} pinned at block ${reader.seqno}\n`);
 
     const stats = await c.getGetPlatformStats();
     check(Number(stats.totalUsers) === snap.users.length,
@@ -37,7 +41,7 @@ export async function run(provider: NetworkProvider) {
     for (const [n, u] of snap.users.entries()) {
         const addr = Address.parse(u.address);
         const info = await c.getGetUserInfo(addr);
-        await sleep(1100);
+        await sleep(Number(process.env.VERIFY_PACE_MS ?? '120'));
 
         if (info === null) { problems.push(`${u.address}: missing from new contract`); continue; }
 
@@ -57,7 +61,7 @@ export async function run(provider: NetworkProvider) {
 
         for (const s of u.stakes) {
             const sd = await c.getGetStakeDetails(addr, BigInt(s.stakeId));
-            await sleep(1100);
+            await sleep(Number(process.env.VERIFY_PACE_MS ?? '120'));
             if (sd === null) { problems.push(`${u.address} stake ${s.stakeId}: missing`); continue; }
             at(`stake ${s.stakeId} amount`, sd.amount, BigInt(s.amount));
             at(`stake ${s.stakeId} isActive`, sd.isActive, s.isActive);
@@ -73,7 +77,7 @@ export async function run(provider: NetworkProvider) {
     let dueNow = 0n, stakedTon = 0n, scanned = 0;
     for (let start = 0; start < snap.users.length; start += 50) {
         const page = await c.getGetTreasuryLiabilities(BigInt(start), 50n);
-        await sleep(1100);
+        await sleep(Number(process.env.VERIFY_PACE_MS ?? '120'));
         dueNow += page.tonDueNow;
         stakedTon += page.activeStakedTon;
         scanned += Number(page.usersScanned);

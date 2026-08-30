@@ -11,6 +11,7 @@
 import { Address, toNano } from '@ton/core';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 import { TonCrown } from '../build/TonCrown/TonCrown_TonCrown';
+import { pinnedReader } from './lib/readClient';
 import { Snapshot, SnapshotUser, SNAPSHOT_FILE } from './exportState';
 import * as fs from 'fs';
 
@@ -66,9 +67,10 @@ export async function run(provider: NetworkProvider) {
     const newAddress = Address.parse(
         process.env.NEW_CONTRACT ?? (await provider.ui().input('New contract address')),
     );
+    // Writes go through blueprint's sender; reads go through v4 (see lib/readClient).
     const c = provider.open(TonCrown.fromAddress(newAddress));
-
-    const status = await c.getGetTreasuryStatus();
+    const reader = await pinnedReader(provider);
+    const status = await reader.open(TonCrown.fromAddress(newAddress)).getGetTreasuryStatus();
     if (status.importsLocked) throw new Error('Imports are locked on this contract — nothing can be written');
     if (snap.partial) throw new Error('This snapshot was taken with EXPORT_LIMIT set and is incomplete. Re-run exportState without it.');
 
