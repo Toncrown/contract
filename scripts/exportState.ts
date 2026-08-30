@@ -12,9 +12,10 @@
  * not work: User has 23 fields, and Tact splits a struct past 14 fields into a
  * nested tuple, so everything from spilloverIndex onward sits one level down.
  */
-import { Address, Dictionary } from '@ton/core';
+import { Address } from '@ton/core';
 import { NetworkProvider, sleep } from '@ton/blueprint';
 import { TonCrown as TonCrownV1 } from '../build/TonCrownV1/TonCrownV1_TonCrown';
+import { pinnedReader } from './lib/readClient';
 import * as fs from 'fs';
 
 export const SNAPSHOT_FILE = 'migration-snapshot.json';
@@ -43,6 +44,8 @@ export type SnapshotUser = {
 export type Snapshot = {
     takenAt: string;
     oldContract: string;
+    /** Block the whole snapshot was read at, so it is one consistent view. */
+    blockSeqno: number;
     /** true when EXPORT_LIMIT was set — a smoke test, never import this. */
     partial?: boolean;
     totalUsers: number;
@@ -50,13 +53,15 @@ export type Snapshot = {
     users: SnapshotUser[];
 };
 
-// toncenter's free tier is roughly one request per second, and times out under load.
-// Back off and retry rather than dropping a user out of the snapshot.
+// Reads go through API v4, which is far less rate-limited than toncenter's free tier,
+// but a long export still deserves backoff rather than dropping a user.
+const PACE_MS = Number(process.env.EXPORT_PACE_MS ?? '120');
+
 async function retry<T>(label: string, fn: () => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
         try {
             const out = await fn();
-            await sleep(1100);
+            await sleep(PACE_MS);
             return out;
         } catch (e) {
             if (attempt >= 5) throw new Error(`${label} failed after 6 attempts: ${e}`);
@@ -71,9 +76,12 @@ export async function run(provider: NetworkProvider) {
     const oldAddress = Address.parse(
         process.env.OLD_CONTRACT ?? (await provider.ui().input('Old contract address')),
     );
-    const c = provider.open(TonCrownV1.fromAddress(oldAddress));
+    // API v2 mis-parses the nested half of the User tuple; see lib/readClient.
+    const reader = await pinnedReader(provider);
+    const c = reader.open(TonCrownV1.fromAddress(oldAddress));
 
-    console.log(`Reading ${oldAddress.toString()}\n`);
+    console.log(`Reading ${oldAddress.toString()}`);
+    console.log(`   via ${reader.endpoint} pinned at block ${reader.seqno}\n`);
 
     const stats = await retry('getPlatformStats', () => c.getGetPlatformStats());
     const earnings = await retry('getPlatformEarningsInfo', () => c.getGetPlatformEarningsInfo());
@@ -141,6 +149,7 @@ export async function run(provider: NetworkProvider) {
     const snapshot: Snapshot = {
         takenAt: new Date().toISOString(),
         oldContract: oldAddress.toString(),
+        blockSeqno: reader.seqno,
         partial: limit > 0,
         totalUsers: users.length,
         platform: {

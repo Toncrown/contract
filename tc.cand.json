@@ -1,6 +1,0 @@
-{ "projects": [
-  { "name": "CandV1",  "path": "contracts/legacy_v1.tact", "output": "build/CandV1",  "options": {"debug": false, "external": false}, "mode": "full" },
-  { "name": "CandT1",  "path": "contracts/test.tact",      "output": "build/CandT1",  "options": {"debug": false, "external": false}, "mode": "full" },
-  { "name": "CandT2",  "path": "contracts/test2.tact",     "output": "build/CandT2",  "options": {"debug": false, "external": false}, "mode": "full" },
-  { "name": "CandT3",  "path": "contracts/test3.tact",     "output": "build/CandT3",  "options": {"debug": false, "external": false}, "mode": "full" }
-] }
