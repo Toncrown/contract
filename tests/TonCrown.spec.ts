@@ -28,7 +28,7 @@
 //             users.push(await blockchain.treasury(`user${i}`));
 //         }
 
-//         tonCrown = blockchain.openContract(await TonCrown.fromInit(owner.address));
+//         tonCrown = blockchain.openContract(await TonCrown.fromInit(owner.address, DEPLOY_NONCE));
         
 //         const deployMsg: Deploy = { $$type: 'Deploy', queryId: 0n };
 //         const deployResult = await tonCrown.send(owner.getSender(), { value: toNano('0.5') }, deployMsg);

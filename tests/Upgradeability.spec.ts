@@ -4,6 +4,8 @@ import { TonCrown } from '../build/TonCrown/TonCrown_TonCrown';
 import { TonCrown as UpgradeProbe } from '../build/UpgradeProbe/UpgradeProbe_TonCrown';
 import '@ton/test-utils';
 
+const DEPLOY_NONCE = 0n;
+
 const COSTS = ['0', '1.25', '2.51', '3.77', '5.03', '6.27'];
 
 /**
@@ -24,7 +26,7 @@ describe('upgradeability', () => {
         owner = await bc.treasury('owner');
         alice = await bc.treasury('alice');
 
-        c = bc.openContract(await TonCrown.fromInit(owner.address));
+        c = bc.openContract(await TonCrown.fromInit(owner.address, DEPLOY_NONCE));
         await c.send(owner.getSender(), { value: toNano('0.5') }, { $$type: 'Deploy', queryId: 0n });
         await owner.send({ to: c.address, value: toNano('500'), bounce: false });
 
@@ -37,7 +39,7 @@ describe('upgradeability', () => {
         await c.send(alice.getSender(), { value: toNano('0.05') }, { $$type: 'CheckIn' });
 
         // the "next version": same storage layout, changed logic, extra getter
-        newCode = (await UpgradeProbe.fromInit(owner.address)).init!.code;
+        newCode = (await UpgradeProbe.fromInit(owner.address, DEPLOY_NONCE)).init!.code;
     });
 
     it('swaps code at the same address and keeps every user record', async () => {
@@ -105,6 +107,23 @@ describe('upgradeability', () => {
         await probe.send(bob.getSender(), { value: toNano(COSTS[1]) + toNano('0.05') },
             { $$type: 'UpgradeLevel', targetLevel: 1n, referrerAddress: alice.address });
         expect((await probe.getGetUserInfo(bob.address))!.level).toBe(1n);
+    });
+
+    it('a different deployment nonce gives a clean contract at a new address', async () => {
+        // The escape hatch: ImportUser refuses to overwrite, and init data is otherwise
+        // fixed by the owner alone, so without a nonce a mis-imported record could never
+        // be corrected.
+        const same = await TonCrown.fromInit(owner.address, DEPLOY_NONCE);
+        expect(same.address.toString()).toBe(c.address.toString());   // deterministic
+
+        const fresh = bc.openContract(await TonCrown.fromInit(owner.address, DEPLOY_NONCE + 1n));
+        expect(fresh.address.toString()).not.toBe(c.address.toString());
+
+        await fresh.send(owner.getSender(), { value: toNano('0.5') }, { $$type: 'Deploy', queryId: 0n });
+        expect((await fresh.getGetTreasuryStatus()).totalUsers).toBe(0n);     // empty
+        expect((await fresh.getGetTreasuryStatus()).deploymentNonce).toBe(DEPLOY_NONCE + 1n);
+        expect(await fresh.getGetUserInfo(alice.address)).toBeNull();
+        expect(await c.getGetUserInfo(alice.address)).not.toBeNull();          // original intact
     });
 
     it('only the owner can upgrade the code', async () => {

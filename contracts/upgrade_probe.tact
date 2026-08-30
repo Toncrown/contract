@@ -304,6 +304,7 @@ struct TreasuryStatus {
     isPaused: Bool;
     importsLocked: Bool;
     forwardStakeCapital: Bool;
+    deploymentNonce: Int as uint32;
 }
 
 struct UserStakeSummary {
@@ -352,6 +353,13 @@ contract TonCrown with Deployable, OwnableTransferable {
     // This replaces scanning userList on every purchase.
     eligibleByLevel: map<Int, Address>;
     eligibleCountByLevel: map<Int, Int>;
+
+    // Only affects the contract address, never the logic. ImportUser refuses to
+    // overwrite an existing record, and init data is otherwise fixed by the owner
+    // address alone — so without this, a mis-imported record could never be corrected:
+    // redeploying with the same owner lands on the same address, on top of the bad
+    // state. Bumping the nonce gives a clean instance to import into.
+    deploymentNonce: Int as uint32;
 
     // Owner may seed state from a previous deployment until imports are locked.
     importsLocked: Bool;
@@ -410,8 +418,9 @@ contract TonCrown with Deployable, OwnableTransferable {
     const TX_OWNER_WITHDRAW: Int = 9;
     const TX_REFUND: Int = 10;
 
-    init(owner: Address) {
+    init(owner: Address, deploymentNonce: Int) {
         self.owner = owner;
+        self.deploymentNonce = deploymentNonce;
         self.creatorWallet1 = address("UQCtNZf0MCqmy558C2zgtzK7i69gg0ttOBWmZ-88ScJp40s5");
         self.creatorWallet2 = address("UQDh7i8s3-wUTuEQ5c5umdpYr9ZG5hWs10LwV8ZIMflYezk8");
         self.creatorWallet3 = address("UQBsxkLE-YTsKmBvnJXe3iqiWEcXG2qgHAJO63fIlRgu87dI");
@@ -2033,7 +2042,8 @@ contract TonCrown with Deployable, OwnableTransferable {
             activeStakes: self.activeStakes,
             isPaused: self.isPaused,
             importsLocked: self.importsLocked,
-            forwardStakeCapital: self.forwardStakeCapital
+            forwardStakeCapital: self.forwardStakeCapital,
+            deploymentNonce: self.deploymentNonce
         };
     }
 

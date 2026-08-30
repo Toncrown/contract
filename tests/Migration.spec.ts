@@ -4,6 +4,8 @@ import { TonCrown } from '../build/TonCrown/TonCrown_TonCrown';
 import { TonCrown as TonCrownV1 } from '../build/TonCrownV1/TonCrownV1_TonCrown';
 import '@ton/test-utils';
 
+const DEPLOY_NONCE = 0n;
+
 const COSTS = ['0', '1.25', '2.51', '3.77', '5.03', '6.27', '7.53', '8.78', '10.04', '11.29', '12.55'];
 
 describe('migration', () => {
@@ -11,7 +13,7 @@ describe('migration', () => {
     let owner: SandboxContract<TreasuryContract>;
 
     async function fresh() {
-        const c = bc.openContract(await TonCrown.fromInit(owner.address));
+        const c = bc.openContract(await TonCrown.fromInit(owner.address, DEPLOY_NONCE));
         await c.send(owner.getSender(), { value: toNano('0.5') }, { $$type: 'Deploy', queryId: 0n });
         await owner.send({ to: c.address, value: toNano('2000'), bounce: false });
         return c;

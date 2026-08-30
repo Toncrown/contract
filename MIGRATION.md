@@ -74,6 +74,7 @@ npx blueprint run verifyMigration    # read-only; prints the funding figure
 ```
 
 Rehearse the whole thing on **testnet** first, using a snapshot of real mainnet data.
+Export reads mainnet; import writes testnet. Same commands, same snapshot, free coins.
 
 ## What each script does
 
@@ -137,8 +138,14 @@ the silent stake-capital-loss bug having fired.
 ### 3. Deploy
 
 `npx blueprint run deploy`, from the **same owner wallet**. Record the new address in
-`.env` as `NEW_CONTRACT`. `init(owner)` leaves `importsLocked = false` so state can be
-seeded, and `forwardStakeCapital = true`, preserving the current money flow.
+`.env` as `NEW_CONTRACT`. `init(owner, nonce)` leaves `importsLocked = false` so state can
+be seeded, and `forwardStakeCapital = true`, preserving the current money flow.
+
+> **If an import goes wrong, redeploy with `DEPLOY_NONCE=1`.** `ImportUser` refuses to
+> overwrite an existing record, and the address is otherwise determined by the owner
+> address alone — so redeploying with the same nonce lands right back on the bad state.
+> The nonce is the only way to get a clean instance to import into. It affects nothing
+> but the address.
 
 ### 4. Fund the owner wallet first
 
@@ -149,7 +156,11 @@ wallet upfront. Budget ~15 TON.
 
 ### 5. Import
 
-`npx blueprint run importState`. Safe to re-run; it resumes.
+`npx blueprint run importState`. Safe to re-run; it resumes from
+`migration-progress.json`.
+
+If a record lands wrong, do **not** try to patch it: bump `DEPLOY_NONCE`, redeploy,
+delete `migration-progress.json`, and import again from the same snapshot.
 
 ### 6. Verify before locking
 
