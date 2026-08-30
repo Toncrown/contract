@@ -3,6 +3,8 @@ import { toNano, fromNano, Address } from '@ton/core';
 import { TonCrown } from '../build/TonCrown/TonCrown_TonCrown';
 import '@ton/test-utils';
 
+const DEPLOY_NONCE = 0n;
+
 const COSTS = ['0', '1.25', '2.51', '3.77', '5.03', '6.27', '7.53', '8.78', '10.04', '11.29', '12.55'];
 const BUFFER = toNano('0.05');
 
@@ -17,7 +19,7 @@ describe('TonCrown regressions', () => {
         bc = await Blockchain.create();
         bc.now = Math.floor(Date.now() / 1000);
         owner = await bc.treasury('owner');
-        c = bc.openContract(await TonCrown.fromInit(owner.address));
+        c = bc.openContract(await TonCrown.fromInit(owner.address, DEPLOY_NONCE));
         await c.send(owner.getSender(), { value: toNano('0.5') }, { $$type: 'Deploy', queryId: 0n });
         if (prefund !== '0') await owner.send({ to: c.address, value: toNano(prefund), bounce: false });
     }

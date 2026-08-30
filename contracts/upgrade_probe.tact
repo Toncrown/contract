@@ -376,7 +376,7 @@ contract TonCrown with Deployable, OwnableTransferable {
     totalSpilloverRewardsPaid: Int as coins;
     totalCreatorRewardsPaid: Int as coins;
 
-    const DAILY_CHECKIN_REWARD: Int = ton("0.01");
+    const DAILY_CHECKIN_REWARD: Int = ton("0.02");
     const LEVEL1_DURATION: Int = 2592000;
     const MIN_STAKE_DURATION: Int = 14;
     const MAX_STAKE_DURATION: Int = 730;
@@ -1708,6 +1708,10 @@ contract TonCrown with Deployable, OwnableTransferable {
     //------------------------------------------------------------------
     // GETTER FUNCTIONS
     //------------------------------------------------------------------
+
+    get fun getContractVersion(): Int {
+        return 2;
+    }
 
     get fun getUserInfo(userAddress: Address): User? {
         return self.users.get(userAddress);

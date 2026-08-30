@@ -2,6 +2,11 @@ import { toNano, Address } from '@ton/core';
 import { TonCrown } from '../build/TonCrown/TonCrown_TonCrown'; // Ensure this path is correct based on your build output
 import { NetworkProvider, compile } from '@ton/blueprint';
 
+// Bump DEPLOY_NONCE to get a clean contract at a new address. Needed only if an import
+// went wrong: ImportUser will not overwrite a record, and the address is otherwise fixed
+// by the owner alone, so redeploying with the same nonce lands back on the bad state.
+const DEPLOY_NONCE = BigInt(process.env.DEPLOY_NONCE ?? '0');
+
 export async function run(provider: NetworkProvider) {
     const sender = provider.sender();
     const ownerAddress = sender.address;
@@ -9,7 +14,7 @@ export async function run(provider: NetworkProvider) {
         throw new Error("Cannot get sender address from provider.");
     }
 
-    console.log(`Deploying TonCrown contract...`);
+    console.log(`Deploying TonCrown contract (nonce ${DEPLOY_NONCE})...`);
     console.log(`Owner/Deployer Address: ${ownerAddress.toString()}`);
 
     // Compile the contract to get the latest code cell
@@ -18,7 +23,7 @@ export async function run(provider: NetworkProvider) {
 
     // Create the contract instance with fromInit to get the stateInit
     const tonCrown = provider.open(
-        await TonCrown.fromInit(ownerAddress)
+        await TonCrown.fromInit(ownerAddress, DEPLOY_NONCE)
     );
 
     console.log(`New contract address will be: ${tonCrown.address.toString()}`);
