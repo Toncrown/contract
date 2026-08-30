@@ -20,6 +20,16 @@
         "external": false
       },
       "mode": "full"
+    },
+    {
+      "name": "UpgradeProbe",
+      "path": "contracts/upgrade_probe.tact",
+      "output": "build/UpgradeProbe",
+      "options": {
+        "debug": false,
+        "external": false
+      },
+      "mode": "full"
     }
   ]
 }
