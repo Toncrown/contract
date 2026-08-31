@@ -103,10 +103,35 @@ from 2.5s to 4s; two further transient failures after that were absorbed silentl
 
 1. **Fund the new contract with 222.4 TON** to cover stake principal. It holds 9.59 TON;
    8.53 TON is claimable right now.
-2. **`LockImports`** — one-way. After it the owner can no longer write user records.
-3. **`SetDistributor`** on the new contract.
-4. **Point the frontend and `distr/` at the new address**, then unfreeze.
-5. **`OwnerWithdraw`** the old contract's 0.95 TON.
+2. **Point the frontend at the new address**, then unfreeze.
+3. **`OwnerWithdraw`** the old contract's 0.95 TON.
+4. **`LockImports`** — see below. Best done after real users have confirmed their
+   balances look right, since it cannot be undone.
+
+`SetDistributor` is not needed: `distributorAddress` defaults to the owner address at
+deployment, so `DistributeDailyRewards` already works from the owner wallet.
+
+### What LockImports does
+
+It sets `importsLocked = true`, permanently blocking `ImportUser`, `ImportDownline`,
+`ImportStake` and `ImportPlatformTotals`. There is no unlock receiver.
+
+While imports are open the owner can write user records directly — including
+`pendingCheckInRewards`, which is claimable TON created from nothing, and stakes of any
+size that entitle an address to ROI and a principal refund. Locking removes that ability
+and makes it publicly visible via `getTreasuryStatus.importsLocked` that it is gone.
+
+It does not affect normal operation: registration, upgrades, staking, check-ins and
+claims behave identically either way.
+
+The trade-off is that it cannot be reversed. If a record later turns out to be missing or
+wrong, the only recourse is `DEPLOY_NONCE=1` and repeating the whole migration at a new
+address. Verification passed on all 106 users, so waiting only buys the one check
+automation cannot perform: a user recognising their own numbers.
+
+`UpgradeContract` could ship code that re-opens imports, so this is not an absolute
+guarantee against a determined owner — but it is a real lock in the current code, and
+changing it would be an on-chain code change anyone can see.
 
 Do not unfreeze the frontend while it still points at the old contract: its balance
 (0.95 TON) is near the ~1.25 TON refund threshold, and it re-arms on its own as
