@@ -25,3 +25,4 @@ Session.vim
 .env.example
 migration-snapshot*.json
 migration-progress.json
+import.log
