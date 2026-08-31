@@ -25,3 +25,4 @@ import.log
 verify.log
 *.log
 migration-*.json
+.migration-out/
