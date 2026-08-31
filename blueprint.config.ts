@@ -1,70 +1,17 @@
-import { mnemonicToWalletKey } from '@ton/crypto';
-<<<<<<< Updated upstream
-import { WalletContractV4, WalletContractV5R1 } from '@ton/ton';
-
-const getNetwork = async (endpoint: string) => {
-    const mnemonic = process.env.MNEMONIC?.trim().split(/\s+/);
-
-    // TON's standard mnemonic is 24 words; 12-word phrases exist but are the exception.
-    // Rejecting anything but 12 meant a normal Tonkeeper/Tonhub phrase was refused.
-    if (!mnemonic || (mnemonic.length !== 24 && mnemonic.length !== 12)) {
-=======
-import { WalletContractV5R1 } from '@ton/ton';
-
-const getNetwork = async (endpoint: string) => {
-    const mnemonic = process.env.WALLET_MNEMONIC?.split(' ');
-
-    if (!mnemonic || mnemonic.length !== 12 && mnemonic.length !== 24) {
->>>>>>> Stashed changes
-        throw new Error(
-            `Set MNEMONIC to your wallet's 24-word (or 12-word) recovery phrase. ` +
-            `Got ${mnemonic ? mnemonic.length : 0} word(s).`
-        );
-    }
-
-    const key = await mnemonicToWalletKey(mnemonic);
-
-<<<<<<< Updated upstream
-    // The wallet version decides the derived address. Deriving v4 for a wallet that is
-    // actually v5R1 silently produces a different address, which for this project means
-    // signing as something other than the contract owner. Run `blueprint run preflight`
-    // to confirm the derived address before sending anything.
-    const version = (process.env.WALLET_VERSION ?? 'v4').toLowerCase();
-    const wallet =
-        version === 'v5' || version === 'v5r1'
-            ? WalletContractV5R1.create({ workchain: 0, publicKey: key.publicKey })
-            : WalletContractV4.create({ workchain: 0, publicKey: key.publicKey });
-=======
-    const wallet = WalletContractV5R1.create({
-        workchain: 0,
-        publicKey: key.publicKey,
-    });
->>>>>>> Stashed changes
-
-    return {
-        endpoint,
-        apiKey: process.env.TONCENTER_API_KEY,
-
-        sender: {
-            address: wallet.address,
-
-            send: async (args: any) => {
-                const seqno = await wallet.getSeqno(args.provider);
-
-                return await wallet.sendTransfer(args.provider, {
-                    secretKey: key.secretKey,
-                    seqno,
-                    messages: args.messages || [],
-                    sendMode: args.sendMode || 3,
-                });
-            },
-        },
-
-        key,
-        wallet,
-    };
-};
-
+/**
+ * Blueprint reads `contracts`, `compiler`, `build`, `test` and `scripts` from here.
+ *
+ * There used to be a `networks: { testnet, mainnet }` block that built its own wallet
+ * from a mnemonic. Blueprint has no such config key, so none of it ever ran: the
+ * network and signer come from blueprint's own interactive prompt, which reads
+ * WALLET_MNEMONIC, WALLET_VERSION and optionally WALLET_ID / SUBWALLET_NUMBER from the
+ * environment (see createMnemonicProvider in @ton/blueprint). Keeping dead code that
+ * looks like the signing path is worse than not having it — it is what a merge
+ * conflict was left unresolved inside.
+ *
+ * Reads in the migration scripts deliberately bypass blueprint's provider and use
+ * TON API v4 instead; see scripts/lib/readClient.ts for why.
+ */
 export const config = {
     contracts: [
         {
@@ -94,13 +41,5 @@ export const config = {
 
     scripts: {
         scriptDir: './scripts',
-    },
-
-    networks: {
-        testnet: async () =>
-            getNetwork('https://testnet.toncenter.com/api/v2/jsonRPC'),
-
-        mainnet: async () =>
-            getNetwork('https://toncenter.com/api/v2/jsonRPC'),
     },
 };

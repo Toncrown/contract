@@ -23,3 +23,5 @@ Session.vim
 .helix/
 .env
 .env.example
+migration-snapshot*.json
+migration-progress.json
