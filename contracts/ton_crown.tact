@@ -1975,6 +1975,11 @@ contract TonCrown with Deployable, OwnableTransferable {
 
     // Same page window, aggregated. Sum tonDueNow across pages to get the amount the
     // contract must hold right now to satisfy every claim that is already claimable.
+    //
+    // Cost per page scales with how many stakes the users in that page hold, and get
+    // methods have their own gas ceiling. Measured against 105 real users: a page of 25
+    // succeeds, 30 exits -14. Callers should start around 20 and halve on failure rather
+    // than assume a fixed page size keeps working as stakes accumulate.
     get fun getTreasuryLiabilities(start: Int, limit: Int): TreasuryLiabilities {
         let currentTime: Int = now();
         let end: Int = start + limit;

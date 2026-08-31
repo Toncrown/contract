@@ -74,14 +74,29 @@ export async function run(provider: NetworkProvider) {
     }
 
     // What the treasury has to cover before going live.
+    //
+    // getTreasuryLiabilities walks each user's stakes, so its gas cost per page depends
+    // on how many stakes those users hold. Get methods have their own gas ceiling: with
+    // 105 real users a page of 50 exits -14 (out of gas), 25 succeeds. Rather than bake
+    // in a number that silently stops working as stakes accumulate, back off on failure.
     let dueNow = 0n, stakedTon = 0n, scanned = 0;
-    for (let start = 0; start < snap.users.length; start += 50) {
-        const page = await c.getGetTreasuryLiabilities(BigInt(start), 50n);
-        await sleep(Number(process.env.VERIFY_PACE_MS ?? '120'));
-        dueNow += page.tonDueNow;
-        stakedTon += page.activeStakedTon;
-        scanned += Number(page.usersScanned);
+    let page = Number(process.env.LIABILITY_PAGE ?? '20');
+    let start = 0;
+    while (start < snap.users.length) {
+        try {
+            const p = await c.getGetTreasuryLiabilities(BigInt(start), BigInt(page));
+            dueNow += p.tonDueNow;
+            stakedTon += p.activeStakedTon;
+            scanned += Number(p.usersScanned);
+            start = Number(p.toIndex);
+            await sleep(Number(process.env.VERIFY_PACE_MS ?? '120'));
+        } catch (e) {
+            if (page <= 1) throw new Error(`getTreasuryLiabilities failed even at page size 1 from index ${start}: ${(e as Error).message}`);
+            page = Math.max(1, Math.floor(page / 2));
+            console.log(`   liabilities page too large at index ${start}, retrying with page ${page}`);
+        }
     }
+    console.log(`   (liabilities read in pages of ${page})`);
 
     const status = await c.getGetTreasuryStatus();
 
