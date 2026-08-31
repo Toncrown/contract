@@ -4,19 +4,15 @@ build
 dist
 .DS_Store
 package.ts
-
 # VS Code
 .vscode/*
 .history/
 *.vsix
-
 # IDEA files
 .idea
-
 # VIM
 Session.vim
 .vim/
-
 # Other private editor folders
 .nvim/
 .emacs/
@@ -27,3 +23,5 @@ migration-snapshot*.json
 migration-progress.json
 import.log
 verify.log
+*.log
+migration-*.json

@@ -21,7 +21,11 @@ import * as fs from 'fs';
 
 const PROGRESS_FILE = 'migration-progress.json';
 const GAS = toNano('0.05');
-const PAUSE_MS = 2500;
+// Time to let the wallet's seqno settle between sends. Too short and blueprint's own
+// retry can resend against a stale seqno, which the W5 wallet rejects with exit code
+// 133 and toncenter surfaces as a 500.
+const PAUSE_MS = Number(process.env.IMPORT_PAUSE_MS ?? '4000');
+const SEND_ATTEMPTS = 6;
 
 type Progress = {
     /** Which contract this progress belongs to. */
@@ -145,8 +149,27 @@ export async function run(provider: NetworkProvider) {
     console.log(`   ${users.length} users, ${downlines.length} downline links, ${stakes.length} stakes`);
     console.log(`   already done: ${progress.users.length} / ${progress.downlines.length} / ${progress.stakes.length}\n`);
 
+    // A single transient RPC failure used to abort the whole run 35 messages in. Retry
+    // instead. Progress is only marked after a send returns, so a failed attempt leaves
+    // the item queued; if a send actually landed but the response was lost, the retry is
+    // harmless — ImportUser rejects a duplicate on-chain and RECONCILE would catch a
+    // genuine gap.
     const send = async (body: any, label: string, mark: () => void) => {
-        await c.send(provider.sender(), { value: GAS }, body);
+        for (let attempt = 1; ; attempt++) {
+            try {
+                await c.send(provider.sender(), { value: GAS }, body);
+                break;
+            } catch (e) {
+                const msg = (e as Error).message ?? String(e);
+                if (attempt >= SEND_ATTEMPTS) {
+                    throw new Error(`${label} failed after ${SEND_ATTEMPTS} attempts: ${msg}`);
+                }
+                const wait = 5000 * attempt;
+                console.log(`   ${label} send failed (attempt ${attempt}/${SEND_ATTEMPTS}), retrying in ${wait / 1000}s`);
+                console.log(`      ${msg.split(String.fromCharCode(10))[0].slice(0, 160)}`);
+                await sleep(wait);
+            }
+        }
         mark();
         saveProgress(progress);
         console.log(`   ${label}`);
