@@ -105,37 +105,13 @@ from 2.5s to 4s; two further transient failures after that were absorbed silentl
    8.53 TON is claimable right now.
 2. **Point the frontend at the new address**, then unfreeze.
 3. **`OwnerWithdraw`** the old contract's 0.95 TON.
-4. **`LockImports`** — see below. Best done after real users have confirmed their
-   balances look right, since it cannot be undone.
+
+Do not unfreeze the frontend while it still points at the old contract: that contract's
+balance (0.95 TON) is near the ~1.25 TON refund threshold, and it climbs on its own as
+registrations accumulate.
 
 `SetDistributor` is not needed: `distributorAddress` defaults to the owner address at
 deployment, so `DistributeDailyRewards` already works from the owner wallet.
-
-### What LockImports does
-
-It sets `importsLocked = true`, permanently blocking `ImportUser`, `ImportDownline`,
-`ImportStake` and `ImportPlatformTotals`. There is no unlock receiver.
-
-While imports are open the owner can write user records directly — including
-`pendingCheckInRewards`, which is claimable TON created from nothing, and stakes of any
-size that entitle an address to ROI and a principal refund. Locking removes that ability
-and makes it publicly visible via `getTreasuryStatus.importsLocked` that it is gone.
-
-It does not affect normal operation: registration, upgrades, staking, check-ins and
-claims behave identically either way.
-
-The trade-off is that it cannot be reversed. If a record later turns out to be missing or
-wrong, the only recourse is `DEPLOY_NONCE=1` and repeating the whole migration at a new
-address. Verification passed on all 106 users, so waiting only buys the one check
-automation cannot perform: a user recognising their own numbers.
-
-`UpgradeContract` could ship code that re-opens imports, so this is not an absolute
-guarantee against a determined owner — but it is a real lock in the current code, and
-changing it would be an on-chain code change anyone can see.
-
-Do not unfreeze the frontend while it still points at the old contract: its balance
-(0.95 TON) is near the ~1.25 TON refund threshold, and it re-arms on its own as
-registrations accumulate.
 
 ## Future upgrades need no migration
 
@@ -148,15 +124,3 @@ percentages, receivers and getters is safe. Adding, removing or reordering **sto
 fields** needs the new code written to read the data already there.
 
 If an import ever needs redoing, `DEPLOY_NONCE=1` gives a clean instance at a new address.
-
-## Known limits
-
-- **Stake capital still forwards to `creatorWallet3`** (`forwardStakeCapital = true`, kept
-  at the owner's direction). The contract owes 222.4 TON it does not hold, so solvency
-  depends on funding. `SetStakeCapitalPolicy{false}` would make refunds self-funding.
-- **Admin getters have gas ceilings**, measured on real data:
-  `getTreasuryLiabilities` max page 25 (use 20), `getAdminUserSnapshotsPaginated` max 20
-  (use 10), `getUserListPaginated` fine at 50. These shrink as stakes accumulate.
-- **The owner can drain everything** — `OwnerWithdraw`, `UpgradeContract`, `ChangeOwner`.
-- **No independent audit.** One reviewer found 7 bugs in code that ran live for months;
-  that is the base rate for a single pass.
