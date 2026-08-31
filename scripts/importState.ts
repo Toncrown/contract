@@ -7,6 +7,10 @@
  *
  * Safe to re-run: progress is written to migration-progress.json after every message,
  * and completed items are skipped. If it dies halfway, run it again.
+ *
+ * RECONCILE=1 first checks that every user the progress file claims to have imported is
+ * actually present on-chain, and re-queues any that are not. Progress records sends, not
+ * confirmations, so a message that failed on-chain would otherwise be skipped forever.
  */
 import { Address, toNano } from '@ton/core';
 import { NetworkProvider, sleep } from '@ton/blueprint';
@@ -102,6 +106,36 @@ export async function run(provider: NetworkProvider) {
     if (snap.partial) throw new Error('This snapshot was taken with EXPORT_LIMIT set and is incomplete. Re-run exportState without it.');
 
     const progress = loadProgress(newAddress.toString(), snap.blockSeqno);
+
+    // Progress is recorded when a message is SENT, not when it lands. A message that
+    // failed on-chain would therefore be marked done and skipped on a re-run, leaving a
+    // gap that ImportUser can never fill afterwards because it refuses to overwrite.
+    // RECONCILE=1 checks each supposedly-imported user actually exists and re-queues the
+    // ones that do not. Worth running before the final verify on a real migration.
+    if (process.env.RECONCILE === '1' && progress.users.length > 0) {
+        console.log(`Reconciling ${progress.users.length} recorded users against the contract…`);
+        const readC = reader.open(TonCrown.fromAddress(newAddress));
+        const stillThere: string[] = [];
+        const missing: string[] = [];
+        for (const addr of progress.users) {
+            const onChain = await readC.getGetUserInfo(Address.parse(addr));
+            (onChain === null ? missing : stillThere).push(addr);
+            await sleep(120);
+        }
+        if (missing.length > 0) {
+            console.log(`   ${missing.length} recorded user(s) are NOT on-chain; re-queuing them:`);
+            missing.slice(0, 10).forEach((a) => console.log(`      ${a}`));
+            if (missing.length > 10) console.log(`      … and ${missing.length - 10} more`);
+            progress.users = stillThere;
+            // their downlines and stakes must be replayed too
+            progress.downlines = progress.downlines.filter((k) => !missing.includes(k.split(':')[0]));
+            progress.stakes = progress.stakes.filter((k) => !missing.includes(k.split(':')[0]));
+            saveProgress(progress);
+        } else {
+            console.log(`   all ${stillThere.length} present.
+`);
+        }
+    }
     const users = [...snap.users].sort((a, b) => a.index - b.index);
     const downlines = collectDownlines(users);
     const stakes = users.flatMap((u) => u.stakes.map((s) => ({ user: u.address, stake: s })));
