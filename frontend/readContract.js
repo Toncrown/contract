@@ -34,24 +34,27 @@ export async function getUserSummary(client, userAddress) {
   try {
     const { stack } = await client.runMethod(CONTRACT_ADDRESS, 'getUserSummary', addrArg(userAddress));
 
-    // Optional struct: one stack item that is either null or the field tuple.
-    const inner = stack.readTupleOpt();
-    if (inner === null) return null;
+    // Read straight off the stack. The struct is returned non-optional on purpose: Tact
+    // wraps an optional return in a tuple, and a wrapping tuple is precisely the nesting
+    // that API v2 cannot type — an optional version of this getter fails with
+    // "Not a cell" over v2 while working perfectly in tests.
+    const exists = stack.readBoolean();
+    if (!exists) return null;             // address is not registered
 
     return {
-      referrer: readAddressOpt(inner),
-      linkReferrer: readAddressOpt(inner),
-      level: inner.readBigNumber(),
-      vipClass: inner.readBigNumber(),
-      directReferrals: inner.readBigNumber(),
-      totalReferrals: inner.readBigNumber(),
-      otherReferrals: inner.readBigNumber(),
-      lastCheckIn: inner.readBigNumber(),
-      levelExpiration: inner.readBigNumber(),
-      totalEarned: inner.readBigNumber(),
-      isActive: inner.readBoolean(),
-      registrationTime: inner.readBigNumber(),
-      stakeCounter: inner.readBigNumber(),
+      referrer: readAddressOpt(stack),
+      linkReferrer: readAddressOpt(stack),
+      level: stack.readBigNumber(),
+      vipClass: stack.readBigNumber(),
+      directReferrals: stack.readBigNumber(),
+      totalReferrals: stack.readBigNumber(),
+      otherReferrals: stack.readBigNumber(),
+      lastCheckIn: stack.readBigNumber(),
+      levelExpiration: stack.readBigNumber(),
+      totalEarned: stack.readBigNumber(),
+      isActive: stack.readBoolean(),
+      registrationTime: stack.readBigNumber(),
+      stakeCounter: stack.readBigNumber(),
     };
   } catch (e) {
     console.warn('[TonCrown] getUserSummary failed', e?.message);

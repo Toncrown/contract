@@ -273,6 +273,10 @@ struct PlatformEarningsInfo {
 // why the frontend carries getUserInfoSafe, rawStackValue and a level reconstructed from
 // transaction history. Everything below stays flat so an ordinary v2 read just works.
 struct UserSummary {
+    // Returned non-optional with an explicit flag. An optional struct is wrapped in a
+    // tuple by Tact, and a wrapping tuple is exactly the nesting that TON API v2 fails
+    // to type — which would defeat the point of keeping this struct flat.
+    exists: Bool;
     referrer: Address?;
     linkReferrer: Address?;
     level: Int as uint8;
@@ -2111,11 +2115,20 @@ contract TonCrown with Deployable, OwnableTransferable {
     }
 
     // Flat alternative to getUserInfo for clients on TON API v2. Same values, no nesting.
-    get fun getUserSummary(userAddress: Address): UserSummary? {
+    get fun getUserSummary(userAddress: Address): UserSummary {
         let u: User? = self.users.get(userAddress);
-        if (u == null) { return null; }
+        if (u == null) {
+            return UserSummary{
+                exists: false,
+                referrer: null, linkReferrer: null,
+                level: 0, vipClass: 0, directReferrals: 0, totalReferrals: 0,
+                otherReferrals: 0, lastCheckIn: 0, levelExpiration: 0, totalEarned: 0,
+                isActive: false, registrationTime: 0, stakeCounter: 0
+            };
+        }
         let user: User = u!!;
         return UserSummary{
+            exists: true,
             referrer: user.referrer,
             linkReferrer: user.linkReferrer,
             level: user.level,

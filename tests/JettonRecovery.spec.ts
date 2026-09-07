@@ -149,9 +149,10 @@ describe('stranded jetton recovery via UpgradeContract', () => {
     it('the flat getters return the same values as getUserInfo, without nesting', async () => {
         const fixed = await upgradeToFixed();
         const full = (await fixed.getGetUserInfo(alice.address))!;
-        const summary = (await fixed.getGetUserSummary(alice.address))!;
+        const summary = await fixed.getGetUserSummary(alice.address);
 
         // every field the frontend reconstructs today
+        expect(summary.exists).toBe(true);
         expect(summary.level).toBe(full.level);
         expect(summary.vipClass).toBe(full.vipClass);
         expect(summary.directReferrals).toBe(full.directReferrals);
@@ -165,9 +166,14 @@ describe('stranded jetton recovery via UpgradeContract', () => {
         expect(summary.stakeCounter).toBe(full.stakeCounter);
         expect(summary.referrer?.toString() ?? null).toBe(full.referrer?.toString() ?? null);
 
-        // an unknown address is null, not a zeroed record
+        // An unknown address returns exists:false rather than null. The struct is
+        // deliberately not optional: Tact wraps an optional return in a tuple, and a
+        // wrapping tuple is the nesting that TON API v2 cannot type.
         const stranger = await bc.treasury('stranger');
-        expect(await fixed.getGetUserSummary(stranger.address)).toBeNull();
+        const none = await fixed.getGetUserSummary(stranger.address);
+        expect(none.exists).toBe(false);
+        expect(none.level).toBe(0n);
+        expect(none.referrer).toBeNull();
     });
 
     it('getContractConfig replaces the frontend raw-state parser', async () => {

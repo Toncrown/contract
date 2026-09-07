@@ -151,6 +151,11 @@ message SetUsdtJettonWallet {
     wallet: Address;
 }
 
+message WithdrawJettons {
+    to: Address;
+    amount: Int as coins;
+}
+
 message SetDistributor {
     address: Address;
 }
@@ -260,6 +265,44 @@ struct PlatformEarningsInfo {
     totalUnclaimedCheckInRewards: Int as coins;
     activeStakes: Int as uint32;
     contractBalance: Int as coins;
+}
+
+// Deliberately flat and under fifteen fields. Tact splits a struct past its fourteenth
+// field into a nested tuple, and TON API v2 does not type the items of a nested tuple —
+// which is why reading `User` (23 fields) through v2 yields zeros or "Not a cell", and
+// why the frontend carries getUserInfoSafe, rawStackValue and a level reconstructed from
+// transaction history. Everything below stays flat so an ordinary v2 read just works.
+struct UserSummary {
+    referrer: Address?;
+    linkReferrer: Address?;
+    level: Int as uint8;
+    vipClass: Int as uint8;
+    directReferrals: Int as uint16;
+    totalReferrals: Int as uint32;
+    otherReferrals: Int as uint32;
+    lastCheckIn: Int as uint32;
+    levelExpiration: Int as uint32;
+    totalEarned: Int as coins;
+    isActive: Bool;
+    registrationTime: Int as uint32;
+    stakeCounter: Int as uint16;
+}
+
+// The contract exposed no getter for its own configuration, so the frontend read it out
+// of raw account state, hardcoding the field layout. A storage change would have broken
+// that silently.
+struct ContractConfig {
+    owner: Address;
+    creatorWallet1: Address;
+    creatorWallet2: Address;
+    creatorWallet3: Address;
+    creatorWallet4: Address;
+    usdtJettonWalletAddress: Address;
+    distributorAddress: Address;
+    isPaused: Bool;
+    importsLocked: Bool;
+    forwardStakeCapital: Bool;
+    deploymentNonce: Int as uint32;
 }
 
 struct AdminUserSnapshot {
@@ -837,6 +880,34 @@ contract TonCrown with Deployable, OwnableTransferable {
     receive(msg: SetUsdtJettonWallet) {
         self.requireOwner();
         self.usdtJettonWalletAddress = msg.wallet;
+    }
+
+    // Jettons can reach this contract without any state being recorded against them.
+    // A transfer whose notification is rejected — which is what happens for every
+    // deposit made before SetUsdtJettonWallet was called, since the notification then
+    // fails the "Unknown jetton wallet" check — still completes at the jetton level:
+    // the tokens sit in the contract's jetton wallet with nothing owing them to anyone.
+    // Every other JettonTransfer this contract sends is tied to a stake, so without
+    // this there is no way to move them.
+    //
+    // Set usdtJettonWalletAddress first, or this sends into the void.
+    receive(msg: WithdrawJettons) {
+        self.requireOwner();
+        require(msg.amount > 0, "Amount must be positive");
+        send(SendParameters{
+            to: self.usdtJettonWalletAddress,
+            value: ton("0.05"),
+            mode: SendPayGasSeparately,
+            body: JettonTransfer{
+                queryId: 0,
+                amount: msg.amount,
+                destination: msg.to,
+                response_destination: self.owner,
+                custom_payload: null,
+                forward_ton_amount: ton("0.005"),
+                forward_payload: "Jetton Withdrawal".asComment().asSlice()
+            }.toCell()
+        });
     }
 
     receive(msg: SetDistributor) {
@@ -2029,6 +2100,51 @@ contract TonCrown with Deployable, OwnableTransferable {
             activeStakedUsdt: stakedUsdt,
             activeStakeCount: activeCount,
             tonDueNow: checkIn + pendingTon + maturedTon
+        };
+    }
+
+    // The contract's own jetton wallet. Read it before a USDT deposit: while this is
+    // still the deploy default (the owner address) every USDT transfer notification is
+    // rejected and the tokens strand in the jetton wallet.
+    get fun getUsdtJettonWallet(): Address {
+        return self.usdtJettonWalletAddress;
+    }
+
+    // Flat alternative to getUserInfo for clients on TON API v2. Same values, no nesting.
+    get fun getUserSummary(userAddress: Address): UserSummary? {
+        let u: User? = self.users.get(userAddress);
+        if (u == null) { return null; }
+        let user: User = u!!;
+        return UserSummary{
+            referrer: user.referrer,
+            linkReferrer: user.linkReferrer,
+            level: user.level,
+            vipClass: user.vipClass,
+            directReferrals: user.directReferrals,
+            totalReferrals: user.totalReferrals,
+            otherReferrals: user.otherReferrals,
+            lastCheckIn: user.lastCheckIn,
+            levelExpiration: user.levelExpiration,
+            totalEarned: user.totalEarned,
+            isActive: user.isActive,
+            registrationTime: user.registrationTime,
+            stakeCounter: user.stakeCounter
+        };
+    }
+
+    get fun getContractConfig(): ContractConfig {
+        return ContractConfig{
+            owner: self.owner,
+            creatorWallet1: self.creatorWallet1,
+            creatorWallet2: self.creatorWallet2,
+            creatorWallet3: self.creatorWallet3,
+            creatorWallet4: self.creatorWallet4,
+            usdtJettonWalletAddress: self.usdtJettonWalletAddress,
+            distributorAddress: self.distributorAddress,
+            isPaused: self.isPaused,
+            importsLocked: self.importsLocked,
+            forwardStakeCapital: self.forwardStakeCapital,
+            deploymentNonce: self.deploymentNonce
         };
     }
 
