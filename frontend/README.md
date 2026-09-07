@@ -30,10 +30,29 @@ There are two independent fixes, and you can take either or both:
 
 `readContract.js` uses (1) and falls back to `getUserInfo` so it works either way.
 
+### One gotcha worth knowing
+
+`getUserSummary` is returned **non-optional**, carrying an `exists: Bool` flag, rather
+than as `UserSummary?`. Tact wraps an optional struct return in a tuple, and a wrapping
+tuple is exactly the nesting API v2 cannot type — the optional version shipped once and
+failed against mainnet with "Not a cell" while passing every unit test, because the
+sandbox types nested tuples correctly.
+
+Live state on mainnet, read over API v2:
+
+```
+exists        true
+level         1
+regTime       1784007865
+```
+
+Previously that same read returned zeros, which is what
+`buildFallbackUserFromSafeGetters` was reconstructing a level from.
+
 ## New contract capabilities
 
 ```
-getUserSummary(address)   -> flat user scalars, or null
+getUserSummary(address)   -> flat user scalars, with an `exists` flag
 getContractConfig()       -> owner, 4 creator wallets, USDT jetton wallet,
                              distributor, isPaused, importsLocked,
                              forwardStakeCapital, deploymentNonce
