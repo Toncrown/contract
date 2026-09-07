@@ -30,6 +30,16 @@
         "external": false
       },
       "mode": "full"
+    },
+    {
+      "name": "DeployedNow",
+      "path": "contracts/deployed_now.tact",
+      "output": "build/DeployedNow",
+      "options": {
+        "debug": false,
+        "external": false
+      },
+      "mode": "full"
     }
   ]
 }

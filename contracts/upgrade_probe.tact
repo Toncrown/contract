@@ -151,6 +151,11 @@ message SetUsdtJettonWallet {
     wallet: Address;
 }
 
+message WithdrawJettons {
+    to: Address;
+    amount: Int as coins;
+}
+
 message SetDistributor {
     address: Address;
 }
@@ -837,6 +842,34 @@ contract TonCrown with Deployable, OwnableTransferable {
     receive(msg: SetUsdtJettonWallet) {
         self.requireOwner();
         self.usdtJettonWalletAddress = msg.wallet;
+    }
+
+    // Jettons can reach this contract without any state being recorded against them.
+    // A transfer whose notification is rejected — which is what happens for every
+    // deposit made before SetUsdtJettonWallet was called, since the notification then
+    // fails the "Unknown jetton wallet" check — still completes at the jetton level:
+    // the tokens sit in the contract's jetton wallet with nothing owing them to anyone.
+    // Every other JettonTransfer this contract sends is tied to a stake, so without
+    // this there is no way to move them.
+    //
+    // Set usdtJettonWalletAddress first, or this sends into the void.
+    receive(msg: WithdrawJettons) {
+        self.requireOwner();
+        require(msg.amount > 0, "Amount must be positive");
+        send(SendParameters{
+            to: self.usdtJettonWalletAddress,
+            value: ton("0.05"),
+            mode: SendPayGasSeparately,
+            body: JettonTransfer{
+                queryId: 0,
+                amount: msg.amount,
+                destination: msg.to,
+                response_destination: self.owner,
+                custom_payload: null,
+                forward_ton_amount: ton("0.005"),
+                forward_payload: "Jetton Withdrawal".asComment().asSlice()
+            }.toCell()
+        });
     }
 
     receive(msg: SetDistributor) {
@@ -1979,6 +2012,11 @@ contract TonCrown with Deployable, OwnableTransferable {
 
     // Same page window, aggregated. Sum tonDueNow across pages to get the amount the
     // contract must hold right now to satisfy every claim that is already claimable.
+    //
+    // Cost per page scales with how many stakes the users in that page hold, and get
+    // methods have their own gas ceiling. Measured against 105 real users: a page of 25
+    // succeeds, 30 exits -14. Callers should start around 20 and halve on failure rather
+    // than assume a fixed page size keeps working as stakes accumulate.
     get fun getTreasuryLiabilities(start: Int, limit: Int): TreasuryLiabilities {
         let currentTime: Int = now();
         let end: Int = start + limit;
@@ -2029,6 +2067,13 @@ contract TonCrown with Deployable, OwnableTransferable {
             activeStakeCount: activeCount,
             tonDueNow: checkIn + pendingTon + maturedTon
         };
+    }
+
+    // The contract's own jetton wallet. Read it before a USDT deposit: while this is
+    // still the deploy default (the owner address) every USDT transfer notification is
+    // rejected and the tokens strand in the jetton wallet.
+    get fun getUsdtJettonWallet(): Address {
+        return self.usdtJettonWalletAddress;
     }
 
     get fun getTreasuryStatus(): TreasuryStatus {
