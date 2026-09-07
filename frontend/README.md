@@ -12,9 +12,9 @@ contract lacked a getter.
 | `adminJettons.jsx` | — | New admin panel section: shows the contract's USDT jetton wallet and withdraws stranded jettons |
 | `App.integration.md` | — | Exact edits to wire `adminJettons.jsx` into `App.jsx` |
 
-Start with `App.integration.md` if you have already imported `AdminJettons`: it is called
-inside `AdminDashboard`, which does not receive `client` or `tonConnectUI`, so the Treasury
-tab throws `ReferenceError` until those are forwarded.
+`App.integration.md` records the wiring, now applied. `AdminJettons` is called
+inside `AdminDashboard`, which did not receive `client` or `tonConnectUI`, so the Treasury
+tab threw `ReferenceError` until those were forwarded.
 
 ## The bug all of this worked around
 

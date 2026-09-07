@@ -1,15 +1,20 @@
 # Wiring AdminJettons into App.jsx
 
-Three edits. The first two are required — without them the Treasury tab throws
-`ReferenceError: client is not defined` as soon as it renders, because `AdminJettons` is
-called inside `AdminDashboard`, which never receives `client` or `tonConnectUI`.
+**Status: applied** to `TON CROWN/frontend/src/App.jsx` on 7 Sep 2026. All three edits
+below are in the file; `npx vite build` succeeds, and the two `no-undef` errors ESLint
+reported (`'client' is not defined` at the old line 2887, `'tonConnectUI' is not defined`
+at 2890) are gone. Kept here as a record of what changed and why.
 
-Already correct in your file: the import, and `WithdrawJettons: 3768522461` in `OPCODES`
-(verified against the deployed ABI).
+Without the first two edits the Treasury tab threw `ReferenceError: client is not defined`
+as soon as it rendered, because `AdminJettons` is called inside `AdminDashboard`, which
+never received `client` or `tonConnectUI`.
+
+Already correct before these edits: the import, and `WithdrawJettons: 3768522461` in
+`OPCODES` (verified against the deployed ABI).
 
 ---
 
-## 1. Pass `client` and `tonConnectUI` through `adminProps` — REQUIRED
+## 1. Pass `client` and `tonConnectUI` through `adminProps` — done
 
 In `App()`, find `const adminProps = {` and add the two values. They already exist in that
 scope; they were simply never forwarded.
@@ -23,7 +28,7 @@ scope; they were simply never forwarded.
      walletBalance, balanceLoading, loading,
 ```
 
-## 2. Destructure them in `AdminDashboard` — REQUIRED
+## 2. Destructure them in `AdminDashboard` — done
 
 ```diff
  function AdminDashboard({
@@ -33,7 +38,7 @@ scope; they were simply never forwarded.
    walletBalance, balanceLoading, loading,
 ```
 
-## 3. Move the panel out of the Treasury Position card
+## 3. Move the panel out of the Treasury Position card — done
 
 `AdminJettons` renders its own `<div className="card">`, so nesting it inside another card
 double-borders it. Move it to a sibling, after that card closes.
@@ -72,7 +77,7 @@ double-borders it. Move it to a sibling, after that card closes.
 
 ---
 
-## Optional: read the config from the getter instead of raw state
+## Optional, NOT applied: read the config from the getter instead of raw state
 
 `fetchContractConfig` still walks the raw account state. That happens to work — the fields
 added by the migration all sit *after* `isPaused`, so the prefix it reads is unchanged —
