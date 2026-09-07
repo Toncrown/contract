@@ -267,6 +267,44 @@ struct PlatformEarningsInfo {
     contractBalance: Int as coins;
 }
 
+// Deliberately flat and under fifteen fields. Tact splits a struct past its fourteenth
+// field into a nested tuple, and TON API v2 does not type the items of a nested tuple —
+// which is why reading `User` (23 fields) through v2 yields zeros or "Not a cell", and
+// why the frontend carries getUserInfoSafe, rawStackValue and a level reconstructed from
+// transaction history. Everything below stays flat so an ordinary v2 read just works.
+struct UserSummary {
+    referrer: Address?;
+    linkReferrer: Address?;
+    level: Int as uint8;
+    vipClass: Int as uint8;
+    directReferrals: Int as uint16;
+    totalReferrals: Int as uint32;
+    otherReferrals: Int as uint32;
+    lastCheckIn: Int as uint32;
+    levelExpiration: Int as uint32;
+    totalEarned: Int as coins;
+    isActive: Bool;
+    registrationTime: Int as uint32;
+    stakeCounter: Int as uint16;
+}
+
+// The contract exposed no getter for its own configuration, so the frontend read it out
+// of raw account state, hardcoding the field layout. A storage change would have broken
+// that silently.
+struct ContractConfig {
+    owner: Address;
+    creatorWallet1: Address;
+    creatorWallet2: Address;
+    creatorWallet3: Address;
+    creatorWallet4: Address;
+    usdtJettonWalletAddress: Address;
+    distributorAddress: Address;
+    isPaused: Bool;
+    importsLocked: Bool;
+    forwardStakeCapital: Bool;
+    deploymentNonce: Int as uint32;
+}
+
 struct AdminUserSnapshot {
     userAddress: Address;
     level: Int as uint8;
@@ -2070,6 +2108,44 @@ contract TonCrown with Deployable, OwnableTransferable {
     // rejected and the tokens strand in the jetton wallet.
     get fun getUsdtJettonWallet(): Address {
         return self.usdtJettonWalletAddress;
+    }
+
+    // Flat alternative to getUserInfo for clients on TON API v2. Same values, no nesting.
+    get fun getUserSummary(userAddress: Address): UserSummary? {
+        let u: User? = self.users.get(userAddress);
+        if (u == null) { return null; }
+        let user: User = u!!;
+        return UserSummary{
+            referrer: user.referrer,
+            linkReferrer: user.linkReferrer,
+            level: user.level,
+            vipClass: user.vipClass,
+            directReferrals: user.directReferrals,
+            totalReferrals: user.totalReferrals,
+            otherReferrals: user.otherReferrals,
+            lastCheckIn: user.lastCheckIn,
+            levelExpiration: user.levelExpiration,
+            totalEarned: user.totalEarned,
+            isActive: user.isActive,
+            registrationTime: user.registrationTime,
+            stakeCounter: user.stakeCounter
+        };
+    }
+
+    get fun getContractConfig(): ContractConfig {
+        return ContractConfig{
+            owner: self.owner,
+            creatorWallet1: self.creatorWallet1,
+            creatorWallet2: self.creatorWallet2,
+            creatorWallet3: self.creatorWallet3,
+            creatorWallet4: self.creatorWallet4,
+            usdtJettonWalletAddress: self.usdtJettonWalletAddress,
+            distributorAddress: self.distributorAddress,
+            isPaused: self.isPaused,
+            importsLocked: self.importsLocked,
+            forwardStakeCapital: self.forwardStakeCapital,
+            deploymentNonce: self.deploymentNonce
+        };
     }
 
     get fun getTreasuryStatus(): TreasuryStatus {

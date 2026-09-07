@@ -146,6 +146,47 @@ describe('stranded jetton recovery via UpgradeContract', () => {
         expect((await fixed.getGetPlatformStats()).totalStakedUsdt).toBe(50000000n);
     });
 
+    it('the flat getters return the same values as getUserInfo, without nesting', async () => {
+        const fixed = await upgradeToFixed();
+        const full = (await fixed.getGetUserInfo(alice.address))!;
+        const summary = (await fixed.getGetUserSummary(alice.address))!;
+
+        // every field the frontend reconstructs today
+        expect(summary.level).toBe(full.level);
+        expect(summary.vipClass).toBe(full.vipClass);
+        expect(summary.directReferrals).toBe(full.directReferrals);
+        expect(summary.totalReferrals).toBe(full.totalReferrals);
+        expect(summary.otherReferrals).toBe(full.otherReferrals);
+        expect(summary.lastCheckIn).toBe(full.lastCheckIn);
+        expect(summary.levelExpiration).toBe(full.levelExpiration);
+        expect(summary.totalEarned).toBe(full.totalEarned);
+        expect(summary.isActive).toBe(full.isActive);
+        expect(summary.registrationTime).toBe(full.registrationTime);
+        expect(summary.stakeCounter).toBe(full.stakeCounter);
+        expect(summary.referrer?.toString() ?? null).toBe(full.referrer?.toString() ?? null);
+
+        // an unknown address is null, not a zeroed record
+        const stranger = await bc.treasury('stranger');
+        expect(await fixed.getGetUserSummary(stranger.address)).toBeNull();
+    });
+
+    it('getContractConfig replaces the frontend raw-state parser', async () => {
+        const fixed = await upgradeToFixed();
+        await fixed.send(owner.getSender(), { value: toNano('0.05') },
+            { $$type: 'SetUsdtJettonWallet', wallet: jettonWallet.address });
+
+        const cfg = await fixed.getGetContractConfig();
+        expect(cfg.owner.toString()).toBe(owner.address.toString());
+        expect(cfg.usdtJettonWalletAddress.toString()).toBe(jettonWallet.address.toString());
+        expect(cfg.distributorAddress.toString()).toBe(owner.address.toString());   // deploy default
+        expect(cfg.isPaused).toBe(false);
+        expect(cfg.importsLocked).toBe(false);
+        expect(cfg.forwardStakeCapital).toBe(true);
+        expect(cfg.deploymentNonce).toBe(DEPLOY_NONCE);
+        // matches the dedicated getter
+        expect((await fixed.getGetUsdtJettonWallet()).toString()).toBe(cfg.usdtJettonWalletAddress.toString());
+    });
+
     it('only the owner can withdraw jettons', async () => {
         const fixed = await upgradeToFixed();
         await fixed.send(owner.getSender(), { value: toNano('0.05') },
