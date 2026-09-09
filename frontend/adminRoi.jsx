@@ -127,9 +127,12 @@ export function AdminRoi({ client, contractAddress, tonConnectUI, addToast, load
             <strong>A change applies to time already accrued.</strong> The contract prices
             every unclaimed day at whatever the rate is when the user claims — not at the
             rate when they staked. Lowering a rate reduces balances users can already see.
-            {pending !== null && (
+            {pending !== null ? (
               <> Right now <strong>{(Number(pending) / 1e9).toFixed(4)} TON</strong> of
               rewards are accrued and unclaimed; that is what would be repriced.</>
+            ) : (
+              <> Scan pending rewards on the Overview tab to see exactly how much is
+              accrued and would be repriced.</>
             )}
             <br /><br />
             To change a rate without repricing anyone: announce it, leave the contract
