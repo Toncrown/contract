@@ -24,11 +24,13 @@ import { fetchStakingRoiRates, bpsToPct, pctToBps } from './roiRates';
 
 const OPCODE_SET_VIP_ROI = 137466368;
 
+// Class 4 is deliberately absent: it exists in contract storage but calculateVipClass
+// only ever returns 0-3, so no user can hold it and no stake can reference it. Showing an
+// editable rate for it would invite changing a number that can never pay anyone.
 const CLASS_LABELS = {
   1: 'VIP 1 · levels 4–6',
   2: 'VIP 2 · levels 7–8',
   3: 'VIP 3 · levels 9–10',
-  4: 'VIP 4 · unreachable',
 };
 
 export function AdminRoi({ client, contractAddress, tonConnectUI, addToast, loading, pendingStakingRewards, initialRates }) {
@@ -154,7 +156,7 @@ export function AdminRoi({ client, contractAddress, tonConnectUI, addToast, load
             Contract cap: {bpsToPct(rates.maxAllowed)}%/day.
           </div>
 
-          {[1, 2, 3, 4].map(cls => {
+          {[1, 2, 3].map(cls => {
             const current = rates[cls];
             const draft = drafts[cls] ?? bpsToPct(current);
             const changed = pctToBps(draft) !== Number(current);
