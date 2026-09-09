@@ -25,7 +25,7 @@ const getterBody = (name: string) => {
 
 describe('v2-safe getters stay flat', () => {
     // Getters the frontend reads over TON API v2.
-    const FLAT_GETTERS = ['UserSummary', 'ContractConfig'];
+    const FLAT_GETTERS = ['UserSummary', 'ContractConfig', 'StakingRoiRates'];
 
     for (const name of FLAT_GETTERS) {
         it(`${name} is not split into a nested tuple`, () => {

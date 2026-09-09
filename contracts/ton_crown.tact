@@ -176,6 +176,15 @@ message SetStakeCapitalPolicy {
     forwardToTreasuryWallet: Bool;
 }
 
+// Sets the daily staking rate for one VIP class, in basis points of the staked amount:
+// 95 = 0.95%/day. This is the rate actually PAID. The advertised rate shown to users is
+// derived as this plus ROI_GAS_MARGIN. See the SetVipRoi receiver for what changing a
+// rate does to stakes that are already running.
+message SetVipRoi {
+    vipClass: Int as uint8;
+    stakingRoi: Int as uint16;
+}
+
 message UpgradeContract {
     code: Cell;
 }
@@ -295,6 +304,19 @@ struct UserSummary {
 // The contract exposed no getter for its own configuration, so the frontend read it out
 // of raw account state, hardcoding the field layout. A storage change would have broken
 // that silently.
+// Flat on purpose: scalars only, no nesting. A struct of four VipConfigs would nest and
+// become unreadable over TON API v2, which is the trap getUserSummary already fell into.
+struct StakingRoiRates {
+    class1: Int as uint16;
+    class2: Int as uint16;
+    class3: Int as uint16;
+    class4: Int as uint16;
+    maxAllowed: Int as uint16;
+    // Add this to any class above to get the advertised rate. Exposed so the frontend
+    // derives the headline figure instead of hardcoding the gap.
+    gasMargin: Int as uint16;
+}
+
 struct ContractConfig {
     owner: Address;
     creatorWallet1: Address;
@@ -439,6 +461,16 @@ contract TonCrown with Deployable, OwnableTransferable {
     // buyer themselves or an inactive account.
     const MAX_SPILLOVER_TRIES: Int = 8;
     const SECONDS_PER_DAY: Int = 86400;
+    // stakingRoi is a uint16, so it would otherwise accept 65535 — 655%/day. The cap is
+    // a fat-finger guard, not a policy limit: 500 is 5%/day, well above the 1.95% the
+    // highest class pays today, and low enough that a slipped digit cannot instantly
+    // commit the contract to more than it can ever pay.
+    const MAX_STAKING_ROI: Int = 500;
+    // The advertised rate is 0.05%/day above the rate actually paid out; the difference
+    // is retained to cover gas and platform costs. That is why the classes were seeded
+    // 100/95, 150/145 and 200/195. SetVipRoi takes the PAID rate and re-derives the
+    // advertised one, so the two can never drift apart.
+    const ROI_GAS_MARGIN: Int = 5;
     const ASSET_TON: Int = 0;
     const ASSET_USDT: Int = 1;
 
@@ -929,6 +961,47 @@ contract TonCrown with Deployable, OwnableTransferable {
     receive(msg: SetStakeCapitalPolicy) {
         self.requireOwner();
         self.forwardStakeCapital = msg.forwardToTreasuryWallet;
+    }
+
+    // Changing a staking rate is RETROACTIVE over unclaimed time.
+    //
+    // calculatePendingStakeReward looks the rate up live at claim time and multiplies it
+    // by the days since that stake's lastClaim — the rate is never snapshotted into the
+    // stake, and StakeInfo has no field to snapshot it into. So lowering a rate reduces
+    // rewards a staker has already accrued and can already see on their dashboard, back
+    // to whenever they last claimed. Raising it pays extra for days already elapsed.
+    //
+    // Storing the rate per stake, or keeping a dated rate schedule, would both need new
+    // contract storage — and a SETCODE upgrade cannot add storage fields: the next state
+    // load runs off the end of the old cell and every getter and message fails with exit
+    // code 9. So this receiver is deliberately the blunt version.
+    //
+    // To change a rate without repricing anyone: announce it, leave the contract running
+    // so people can claim (a claim resets lastClaim, which zeroes their exposure without
+    // ending their stake — note that SetPaused would block claims too, so do not pause),
+    // then read getTreasuryLiabilities to see exactly what residue is left and send this.
+    receive(msg: SetVipRoi) {
+        self.requireOwner();
+
+        // calculatePendingStakeReward force-unwraps this lookup, so a class that no stake
+        // can reference is pointless, and a missing one is unreachable to create here.
+        require(msg.vipClass >= 1 && msg.vipClass <= 4, "Unknown VIP class");
+        require(msg.stakingRoi <= self.MAX_STAKING_ROI, "ROI above cap");
+
+        let existing: VipConfig = self.vipConfigs.get(msg.vipClass)!!;
+        self.vipConfigs.set(msg.vipClass, VipConfig{
+            // dailyRoi is the advertised rate — the headline figure users are shown. It
+            // sits ROI_GAS_MARGIN above what is actually paid, the retained slice that
+            // covers gas and platform costs, and nothing in the contract reads it. It is
+            // derived here rather than accepted from the message so the advertised and
+            // paid rates cannot be set inconsistently.
+            dailyRoi: msg.stakingRoi + self.ROI_GAS_MARGIN,
+            minLevel: existing.minLevel,
+            maxLevel: existing.maxLevel,
+            stakingRoi: msg.stakingRoi
+        });
+
+        self.confirm(sender(), "VIP ROI updated");
     }
 
     // The previous deployment had no way to ship a fix. Owner-gated, and no wider than
@@ -2105,6 +2178,27 @@ contract TonCrown with Deployable, OwnableTransferable {
             activeStakeCount: activeCount,
             tonDueNow: checkIn + pendingTon + maturedTon
         };
+    }
+
+    // Every paid staking rate plus the cap, flat, in one call. maxAllowed lets the admin
+    // UI reject an out-of-range value before spending gas on a message that will fail.
+    get fun getStakingRoiRates(): StakingRoiRates {
+        return StakingRoiRates{
+            class1: self.roiOf(1),
+            class2: self.roiOf(2),
+            class3: self.roiOf(3),
+            class4: self.roiOf(4),
+            maxAllowed: self.MAX_STAKING_ROI,
+            gasMargin: self.ROI_GAS_MARGIN
+        };
+    }
+
+    fun roiOf(vipClass: Int): Int {
+        let cfg: VipConfig? = self.vipConfigs.get(vipClass);
+        if (cfg == null) {
+            return 0;
+        }
+        return cfg!!.stakingRoi;
     }
 
     // The contract's own jetton wallet. Read it before a USDT deposit: while this is

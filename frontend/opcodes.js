@@ -23,4 +23,5 @@ export const OPCODES = {
   SetPaused: 157817343,              // emergency stop
   SetStakeCapitalPolicy: 1901797867, // keep staking capital in-contract instead of forwarding
   LockImports: 1151426661,           // one-way: stops the owner writing user records
+  SetVipRoi: 137466368,              // daily staking rate per VIP class, in basis points
 };
