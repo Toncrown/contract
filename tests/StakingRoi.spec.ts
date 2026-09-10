@@ -168,10 +168,14 @@ describe('shipping SetVipRoi to the live contract', () => {
         await live.send(alice.getSender(), { value: toNano('0.05') }, { $$type: 'CheckIn' });
     });
 
-    it('has no way to change ROI before the upgrade', () => {
+    // SetVipRoi shipped to mainnet on 9 September 2026, so DeployedNow — which tracks the
+    // live source — now carries it. Before that upgrade this asserted its absence; the
+    // useful thing to pin now is that the capability is part of the deployed baseline and
+    // a later upgrade must not silently drop it.
+    it('is part of the deployed contract', () => {
         const deployedWrapper = fs.readFileSync('build/DeployedNow/DeployedNow_TonCrown.ts', 'utf8');
-        expect(deployedWrapper).not.toContain('SetVipRoi');
-        expect(deployedWrapper).not.toContain('getStakingRoiRates');
+        expect(deployedWrapper).toContain('SetVipRoi');
+        expect(deployedWrapper).toContain('getStakingRoiRates');
     });
 
     it('upgrades in place, keeps every record, and the rate becomes editable', async () => {

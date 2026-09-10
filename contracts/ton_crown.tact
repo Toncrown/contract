@@ -185,6 +185,14 @@ message SetVipRoi {
     stakingRoi: Int as uint16;
 }
 
+// Closes a matured stake and returns its capital to the staker. Anyone may send it — see
+// the receiver for why that is safe, and why it is the only way to make a refund look
+// automatic on a chain with no scheduler.
+message ReleaseMaturedStake {
+    user: Address;
+    stakeId: Int as uint16;
+}
+
 message UpgradeContract {
     code: Cell;
 }
@@ -963,6 +971,36 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.forwardStakeCapital = msg.forwardToTreasuryWallet;
     }
 
+    // TON has no scheduler. Nothing in a contract runs unless a message arrives, so a
+    // stake cannot literally pay itself out the moment its term ends — something off-chain
+    // has to poke it. This receiver is what makes that poke safe to automate: the platform
+    // sweeps matured stakes on a timer and the staker's capital comes back without them
+    // doing anything.
+    //
+    // Deliberately permissionless. Value only ever moves to the staker, only at or after
+    // the maturity date they chose themselves, and the caller pays the gas — so there is
+    // nothing to gain by calling it against someone else, and no key to lose or rotate.
+    // That is worth more than an owner gate here: a refund path that depends on one hot
+    // wallet stops working the moment that wallet is misconfigured, which is exactly what
+    // happened to DistributeDailyRewards.
+    //
+    // autoRestake stakes are excluded, because rolling over is precisely what that flag
+    // asked for.
+    receive(msg: ReleaseMaturedStake) {
+        self.requireNotPaused();
+
+        let user: User = self.requireUserExists(msg.user);
+        let stakeOpt: StakeInfo? = user.stakes.get(msg.stakeId);
+        require(stakeOpt != null, "Stake not found");
+
+        let stake: StakeInfo = stakeOpt!!;
+        require(stake.isActive, "Stake inactive");
+        require(now() >= stake.startTime + stake.duration, "Stake has not matured");
+        require(!stake.autoRestake, "Stake auto-restakes");
+
+        self.processRewardPayout(msg.user, msg.stakeId);
+    }
+
     // Changing a staking rate is RETROACTIVE over unclaimed time.
     //
     // calculatePendingStakeReward looks the rate up live at claim time and multiplies it
@@ -1658,7 +1696,6 @@ contract TonCrown with Deployable, OwnableTransferable {
 
         let currentTime: Int = now();
         let total: Int = self.calculatePendingStakeReward(currentStake, currentTime);
-        require(total > 0, "No rewards yet");
 
         // Reward and returned capital are paid inside one transaction, so affordability
         // has to be judged against both at once. Checking them one at a time let the
@@ -1668,9 +1705,22 @@ contract TonCrown with Deployable, OwnableTransferable {
         let matured: Bool = currentTime >= currentStake.startTime + currentStake.duration;
         let closingWithCapital: Bool = matured && !currentStake.autoRestake;
 
+        // A matured stake must stay closable even when it owes no further interest.
+        // calculatePendingStakeReward caps elapsed time at maturity and floors it to whole
+        // days, so a stake last claimed inside its final 24 hours accrues nothing more —
+        // and because the capital comes back through this same call, demanding a positive
+        // reward stranded the principal for good. One mainnet stake was already stuck that
+        // way with no route out.
+        require(total > 0 || closingWithCapital, "No rewards yet");
+
         if (currentStake.stakedAsset == self.ASSET_TON) {
-            require(total > self.DISTRIBUTION_GAS_FEE, "Reward below distribution fee");
-            let net: Int = total - self.DISTRIBUTION_GAS_FEE;
+            // Only the reward leg is conditional. A stake closing at maturity may owe zero
+            // interest, and the capital leg below still has to run.
+            let net: Int = 0;
+            if (total > 0) {
+                require(total > self.DISTRIBUTION_GAS_FEE, "Reward below distribution fee");
+                net = total - self.DISTRIBUTION_GAS_FEE;
+            }
 
             let tonRequired: Int = net;
             if (closingWithCapital) {
@@ -1678,46 +1728,54 @@ contract TonCrown with Deployable, OwnableTransferable {
             }
             require(self.availableBalance() >= tonRequired + self.MIN_CONTRACT_RESERVE, "Insufficient contract balance");
 
-            send(SendParameters{
-                to: userAddress,
-                value: net,
-                mode: SendPayGasSeparately,
-                body: "TON Staking Reward".asComment()
-            });
-            user.totalStakingClaimed = user.totalStakingClaimed + net;
-            user.totalEarned = user.totalEarned + net;
+            if (net > 0) {
+                send(SendParameters{
+                    to: userAddress,
+                    value: net,
+                    mode: SendPayGasSeparately,
+                    body: "TON Staking Reward".asComment()
+                });
+                user.totalStakingClaimed = user.totalStakingClaimed + net;
+                user.totalEarned = user.totalEarned + net;
+            }
         } else {
-            send(SendParameters{
-                to: self.usdtJettonWalletAddress,
-                value: ton("0.1"),
-                mode: SendIgnoreErrors,
-                body: JettonTransfer{
-                    queryId: 0,
-                    amount: total,
-                    destination: userAddress,
-                    response_destination: userAddress,
-                    custom_payload: null,
-                    forward_ton_amount: ton("0.005"),
-                    forward_payload: "USDT Staking Reward".asComment().asSlice()
-                }.toCell()
-            });
-            user.totalStakingClaimed = user.totalStakingClaimed + total;
-            user.totalEarned = user.totalEarned + total;
+            // Zero-amount jetton transfers are pointless and some wallets reject them, so
+            // a maturity that owes no interest simply skips the reward leg.
+            if (total > 0) {
+                send(SendParameters{
+                    to: self.usdtJettonWalletAddress,
+                    value: ton("0.1"),
+                    mode: SendIgnoreErrors,
+                    body: JettonTransfer{
+                        queryId: 0,
+                        amount: total,
+                        destination: userAddress,
+                        response_destination: userAddress,
+                        custom_payload: null,
+                        forward_ton_amount: ton("0.005"),
+                        forward_payload: "USDT Staking Reward".asComment().asSlice()
+                    }.toCell()
+                });
+                user.totalStakingClaimed = user.totalStakingClaimed + total;
+                user.totalEarned = user.totalEarned + total;
+            }
         }
 
-        let rewardTxId: Int = user.transactionCounter;
-        user.transactions.set(rewardTxId, UserTransaction{
-            txId: rewardTxId,
-            timestamp: currentTime,
-            txType: self.TX_STAKING_REWARD_CLAIMED,
-            amount: total,
-            level: user.level,
-            stakeId: stakeId,
-            assetType: currentStake.stakedAsset,
-            counterparty: null,
-            description: "Staking Reward Claimed"
-        });
-        user.transactionCounter = user.transactionCounter + 1;
+        if (total > 0) {
+            let rewardTxId: Int = user.transactionCounter;
+            user.transactions.set(rewardTxId, UserTransaction{
+                txId: rewardTxId,
+                timestamp: currentTime,
+                txType: self.TX_STAKING_REWARD_CLAIMED,
+                amount: total,
+                level: user.level,
+                stakeId: stakeId,
+                assetType: currentStake.stakedAsset,
+                counterparty: null,
+                description: "Staking Reward Claimed"
+            });
+            user.transactionCounter = user.transactionCounter + 1;
+        }
 
         if (matured) {
             if (currentStake.autoRestake) {
