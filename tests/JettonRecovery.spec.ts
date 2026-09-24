@@ -107,6 +107,11 @@ describe('stranded jetton recovery via UpgradeContract', () => {
             { $$type: 'SetUsdtJettonWallet', wallet: jettonWallet.address });
         expect((await fixed.getGetUsdtJettonWallet()).toString()).toBe(jettonWallet.address.toString());
 
+        // Stranded tokens arrived without being counted, so the owner records them first —
+        // withdrawals are held to the USDT reserve like every other payout.
+        await fixed.send(owner.getSender(), { value: toNano('0.05') },
+            { $$type: 'SyncUsdtReserve', amount: STRANDED });
+
         // withdraw: a JettonTransfer must reach the jetton wallet naming the owner
         const res = await fixed.send(owner.getSender(), { value: toNano('0.2') },
             { $$type: 'WithdrawJettons', to: owner.address, amount: STRANDED });

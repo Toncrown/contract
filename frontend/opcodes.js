@@ -19,6 +19,7 @@ export const OPCODES = {
 
   // new
   WithdrawJettons: 3768522461,       // move jettons out of the contract's jetton wallet
+  SyncUsdtReserve: 481175454,        // owner sets the USDT payout reserve to the real balance
   UpgradeContract: 241131399,        // owner-only SETCODE
   SetPaused: 157817343,              // emergency stop
   SetStakeCapitalPolicy: 1901797867, // keep staking capital in-contract instead of forwarding

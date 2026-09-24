@@ -40,6 +40,16 @@
         "external": false
       },
       "mode": "full"
+    },
+    {
+      "name": "MainnetSep24",
+      "path": "contracts/mainnet_sep24.tact",
+      "output": "build/MainnetSep24",
+      "options": {
+        "debug": false,
+        "external": false
+      },
+      "mode": "full"
     }
   ]
 }

@@ -104,6 +104,35 @@ export async function run(provider: NetworkProvider) {
     console.log(`\nTON to be returned: ${(Number(capital + interest) / 1e9).toFixed(4)} ` +
         `(${(Number(capital) / 1e9).toFixed(2)} capital + ${(Number(interest) / 1e9).toFixed(4)} interest)`);
 
+    // USDT is paid only out of the reserve the contract has counted, since it cannot see its
+    // jetton balance. A release the reserve cannot cover is refused on-chain, so sending it
+    // only burns gas — budget them here and hold back what does not fit. On code that
+    // predates the reserve the getter is missing, and there a USDT release closes the stake
+    // blind whether or not the tokens exist: skip every one of them.
+    let reserve: bigint | null = null;
+    try {
+        reserve = (await read('getUsdtReserve')).reader.readBigNumber();
+    } catch {
+        reserve = null;
+    }
+    const held: typeof due = [];
+    let budget = reserve ?? 0n;
+    for (const d of [...due]) {
+        if (d.asset === 0) continue;
+        const need = d.amount + d.owed;
+        if (reserve !== null && need <= budget) { budget -= need; continue; }
+        held.push(d);
+        due.splice(due.indexOf(d), 1);
+    }
+    if (held.length) {
+        console.log(reserve === null
+            ? `\nHOLDING ${held.length} USDT release(s): this contract has no USDT reserve, so a release would close the stake without paying it.`
+            : `\nHOLDING ${held.length} USDT release(s): reserve is ${(Number(reserve) / 1e6).toFixed(2)} USDT. Fund the contract and sync the reserve.`);
+        for (const d of held)
+            console.log(`  ${d.user.toString().slice(0, 14)}… #${d.stakeId}  needs ${(Number(d.amount + d.owed) / 1e6).toFixed(2)} USDT`);
+        if (due.length === 0) { console.log('\nNothing else to release.'); return; }
+    }
+
     if (!send) {
         console.log('\nDry run. Re-run with RELEASE=1 to send.');
         return;

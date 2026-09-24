@@ -1,3 +1,6 @@
+// Frozen copy of the source running on mainnet as of 24 Sep 2026 (code hash 0a078c3b…).
+// Upgrade tests start from this, so do not edit it. ton_crown.tact is the next version.
+
 import "@stdlib/deploy";
 import "@stdlib/ownable";
 
@@ -195,14 +198,6 @@ message ReleaseMaturedStake {
 
 message UpgradeContract {
     code: Cell;
-}
-
-// Sets how much USDT the contract counts as available for staking payouts. Owner only.
-// Read the contract's actual USDT wallet balance first and send that figure: this is the
-// one number every USDT payout is checked against, so setting it above the real balance
-// reopens exactly the hole the reserve exists to close. See usdtReserve().
-message SyncUsdtReserve {
-    amount: Int as coins;
 }
 
 message ImportUser {
@@ -487,16 +482,6 @@ contract TonCrown with Deployable, OwnableTransferable {
     const ROI_GAS_MARGIN: Int = 5;
     const ASSET_TON: Int = 0;
     const ASSET_USDT: Int = 1;
-
-    // Where the USDT payout reserve is kept. Not a storage field: SETCODE cannot add one
-    // without a storage migration, because the next load would run off the end of the old
-    // storage cell. It is one entry in spilloverNextIndexByBoughtLevel instead, a map whose
-    // real keys are levels 1–10 and are only ever read and written by level — so this key
-    // is never touched by spillover, and the storage layout is identical to the one on
-    // mainnet. The number is "USDT" in ASCII.
-    const USDT_RESERVE_KEY: Int = 1431520340;
-    // TON the contract attaches to each JettonTransfer it asks its jetton wallet to make.
-    const JETTON_TRANSFER_TON: Int = ton("0.1");
 
     // Hybrid gas policy:
     // - upgrades keep the original 0.05 TON buffer because distribution performs many internal sends;
@@ -801,16 +786,6 @@ contract TonCrown with Deployable, OwnableTransferable {
         let stakerAddress: Address = msg.sender;
         let usdtReceived: Int = msg.amount;
 
-        // USDT sent by the owner or the treasury wallet is funding for payouts, not a stake.
-        // Previously it was parsed as a stake attempt, failed, and was sent straight back.
-        // Only arrives here when the transfer carried enough forward TON to run this code; a
-        // wallet that attaches ~0 (most do) delivers the tokens without notifying us, and the
-        // owner records them with SyncUsdtReserve instead.
-        if (stakerAddress == self.owner || stakerAddress == self.creatorWallet3) {
-            self.setUsdtReserve(self.usdtReserve() + usdtReceived);
-            return;
-        }
-
         // Past this point every rejection returns the jettons instead of throwing.
         // Throwing fails the notification but does not undo the transfer, so the USDT
         // was left stranded in the contract's jetton wallet with nothing recorded
@@ -895,12 +870,6 @@ contract TonCrown with Deployable, OwnableTransferable {
         self.totalStakedUsdt += usdtReceived;
         self.activeStakes += 1;
 
-        // Capital that stays in the contract is available to pay it back. Forwarded capital
-        // is not: it leaves for creatorWallet3 in the same transaction.
-        if (!self.forwardStakeCapital) {
-            self.setUsdtReserve(self.usdtReserve() + usdtReceived);
-        }
-
         if (self.forwardStakeCapital) {
             send(SendParameters{
                 to: self.usdtJettonWalletAddress,
@@ -970,11 +939,6 @@ contract TonCrown with Deployable, OwnableTransferable {
     receive(msg: WithdrawJettons) {
         self.requireOwner();
         require(msg.amount > 0, "Amount must be positive");
-        // Withdrawals come out of the same USDT that pays stakers, so they are held to the
-        // same reserve. Tokens that arrived without being counted (a deposit made before the
-        // wallet was set, a plain transfer) are brought in with SyncUsdtReserve first.
-        require(msg.amount <= self.usdtReserve(), "Amount exceeds USDT reserve; sync it first");
-        self.setUsdtReserve(self.usdtReserve() - msg.amount);
         send(SendParameters{
             to: self.usdtJettonWalletAddress,
             value: ton("0.05"),
@@ -1084,24 +1048,6 @@ contract TonCrown with Deployable, OwnableTransferable {
     receive(msg: UpgradeContract) {
         self.requireOwner();
         setContractCode(msg.code);
-    }
-
-    receive(msg: SyncUsdtReserve) {
-        self.requireOwner();
-        self.setUsdtReserve(msg.amount);
-        self.confirm(sender(), "USDT reserve updated");
-    }
-
-    // A JettonTransfer our jetton wallet refused — almost always "not enough jettons".
-    // The tokens never left, so they go back into the reserve. The stake the transfer was
-    // paying stays closed: the bounce carries only the amount, not whose stake it was,
-    // and recording that would need new storage. The reserve check in processRewardPayout
-    // is what stops this happening; this only keeps the count honest if it ever does.
-    bounced(msg: bounced<JettonTransfer>) {
-        if (sender() != self.usdtJettonWalletAddress) {
-            return;
-        }
-        self.setUsdtReserve(self.usdtReserve() + msg.amount);
     }
 
     //------------------------------------------------------------------
@@ -1259,29 +1205,6 @@ contract TonCrown with Deployable, OwnableTransferable {
 
     fun requireNotPaused() {
         require(!self.isPaused, "Contract is paused");
-    }
-
-    // USDT the contract believes its jetton wallet holds for payouts.
-    //
-    // A contract cannot read its own jetton balance — the jetton wallet is a separate
-    // contract and there are no synchronous calls — so every USDT payout used to be sent
-    // blind and the stake closed in the same transaction whether or not the tokens were
-    // there. Two matured stakes on mainnet were closed and paid nothing that way.
-    //
-    // This counts instead: raised by funding, retained deposits, bounced transfers and
-    // SyncUsdtReserve; lowered by every payout and withdrawal. A payout that would take it
-    // below zero is refused and the stake stays open, the same way a TON payout is refused
-    // when the TON balance cannot cover it.
-    fun usdtReserve(): Int {
-        let v: Int? = self.spilloverNextIndexByBoughtLevel.get(self.USDT_RESERVE_KEY);
-        if (v == null) {
-            return 0;
-        }
-        return v!!;
-    }
-
-    fun setUsdtReserve(amount: Int) {
-        self.spilloverNextIndexByBoughtLevel.set(self.USDT_RESERVE_KEY, amount);
     }
 
     // myBalance() already includes the value of the message being handled, so using it
@@ -1817,34 +1740,13 @@ contract TonCrown with Deployable, OwnableTransferable {
                 user.totalEarned = user.totalEarned + net;
             }
         } else {
-            // The contract cannot see its jetton balance, so it checks the reserve it keeps
-            // instead, against reward and capital together — the same rule as the TON leg
-            // above. Refusing here reverts the whole claim: the stake stays open and can be
-            // claimed again once the contract is funded.
-            let usdtRequired: Int = total;
-            let legs: Int = 0;
-            if (total > 0) {
-                legs = legs + 1;
-            }
-            if (closingWithCapital) {
-                usdtRequired = usdtRequired + currentStake.amount;
-                legs = legs + 1;
-            }
-            require(self.usdtReserve() >= usdtRequired, "Insufficient USDT in contract");
-            // The TON each transfer carries comes from the contract's balance too.
-            require(self.availableBalance() >= legs * self.JETTON_TRANSFER_TON + self.MIN_CONTRACT_RESERVE,
-                "Insufficient contract balance");
-            self.setUsdtReserve(self.usdtReserve() - usdtRequired);
-
             // Zero-amount jetton transfers are pointless and some wallets reject them, so
             // a maturity that owes no interest simply skips the reward leg.
-            // No SendIgnoreErrors on either leg: a dropped action would close the stake
-            // without paying it, so a failed send has to fail the whole transaction.
             if (total > 0) {
                 send(SendParameters{
                     to: self.usdtJettonWalletAddress,
-                    value: self.JETTON_TRANSFER_TON,
-                    mode: SendPayGasSeparately,
+                    value: ton("0.1"),
+                    mode: SendIgnoreErrors,
                     body: JettonTransfer{
                         queryId: 0,
                         amount: total,
@@ -1893,11 +1795,10 @@ contract TonCrown with Deployable, OwnableTransferable {
                     });
                     self.totalStakedTon -= currentStake.amount;
                 } else {
-                    // Reserve and TON were both checked above, against both legs.
                     send(SendParameters{
                         to: self.usdtJettonWalletAddress,
-                        value: self.JETTON_TRANSFER_TON,
-                        mode: SendPayGasSeparately,
+                        value: ton("0.1"),
+                        mode: SendIgnoreErrors,
                         body: JettonTransfer{
                             queryId: 0,
                             amount: currentStake.amount,
@@ -2364,13 +2265,6 @@ contract TonCrown with Deployable, OwnableTransferable {
     // rejected and the tokens strand in the jetton wallet.
     get fun getUsdtJettonWallet(): Address {
         return self.usdtJettonWalletAddress;
-    }
-
-    // USDT available for staking payouts, in 6-decimal units. Compare it with the jetton
-    // wallet's real balance: if the wallet holds more, SyncUsdtReserve brings the extra in;
-    // if it holds less, the reserve is overstated and should be synced down at once.
-    get fun getUsdtReserve(): Int {
-        return self.usdtReserve();
     }
 
     // Flat alternative to getUserInfo for clients on TON API v2. Same values, no nesting.

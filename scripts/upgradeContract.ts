@@ -14,8 +14,13 @@ import { pinnedReader, accountCodeHash } from './lib/readClient';
 import * as fs from 'fs';
 
 const NEW_PKG = 'build/TonCrown/TonCrown_TonCrown.pkg';
-/** Source of the code currently deployed, compiled as its own project. */
-const DEPLOYED_SRC = 'contracts/deployed_now.tact';
+/**
+ * Source of the code currently deployed, compiled as its own project. Moved forward each
+ * time an upgrade ships: after this one lands, snapshot ton_crown.tact again as the next
+ * reference. deployed_now.tact is the version before this one, kept for older tests.
+ */
+const DEPLOYED_SRC = 'contracts/mainnet_sep24.tact';
+const DEPLOYED_PKG = 'build/MainnetSep24/MainnetSep24_TonCrown.pkg';
 const NEW_SRC = 'contracts/ton_crown.tact';
 
 const codeCell = (pkg: string) => Cell.fromBase64(JSON.parse(fs.readFileSync(pkg, 'utf8')).code);
@@ -54,7 +59,7 @@ export async function run(provider: NetworkProvider) {
 
     // The reference build must be the code that is actually live, or the storage
     // comparison below is meaningless.
-    const refHash = codeCell('build/DeployedNow/DeployedNow_TonCrown.pkg').hash().toString('hex');
+    const refHash = codeCell(DEPLOYED_PKG).hash().toString('hex');
     if (refHash !== liveHash) {
         throw new Error(
             `${DEPLOYED_SRC} builds to ${refHash} but the chain is running ${liveHash}. ` +

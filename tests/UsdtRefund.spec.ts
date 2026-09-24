@@ -22,8 +22,9 @@ const DAY = 86400;
  *
  *   - the refund message is well formed and carries capital + reward, so funding the jetton
  *     wallet is sufficient for it to go through;
- *   - nothing in the contract objects when it is unfunded, which is why the stake closes
- *     either way.
+ *   - nothing in the contract used to object when it was unfunded, which is why the stake
+ *     closed either way. The USDT reserve (UsdtReserve.spec.ts) now refuses that claim and
+ *     keeps the stake open; the last test here pins the change.
  *
  * The sandbox stands in for the jetton wallet with a treasury, which accepts anything. That
  * is the point: it is what the real wallet does when funded, and the contract behaves
@@ -102,6 +103,9 @@ describe('matured USDT stake refund', () => {
     it('sends capital and reward to the staker once matured', async () => {
         await stakeUsdt();
         bc.now = bc.now! + DURATION * DAY + 60;
+        // Funded: the owner has put the capital back and accounted for it.
+        await c.send(owner.getSender(), { value: toNano('0.05') },
+            { $$type: 'SyncUsdtReserve', amount: STAKE * 2n });
 
         const res = await c.send(alice.getSender(), { value: toNano('0.2') },
             { $$type: 'ClaimStakingRewards', stakeId: 0n });
@@ -124,22 +128,23 @@ describe('matured USDT stake refund', () => {
             + ` (${(Number(STAKE) / 1e6).toFixed(6)} capital + ${(Number(reward) / 1e6).toFixed(6)} reward)`);
     });
 
-    it('closes the stake whether or not the tokens could possibly arrive', async () => {
+    it('no longer closes the stake when the tokens are not there', async () => {
         await stakeUsdt();
         bc.now = bc.now! + DURATION * DAY + 60;
 
         const res = await c.send(alice.getSender(), { value: toNano('0.2') },
             { $$type: 'ClaimStakingRewards', stakeId: 0n });
 
-        // The claim itself succeeds and the position is gone. Nothing here depends on the
-        // jetton wallet having any balance — the contract cannot see it, so it cannot
-        // refuse. This is precisely why the mainnet stake died silently.
+        // This used to succeed and close the position with nothing behind the transfer —
+        // precisely how the mainnet stake died silently. The contract still cannot see its
+        // jetton balance, but it now counts what it holds, and with nothing counted it
+        // refuses: the claim fails and the stake stays open to be claimed once funded.
         expect(res.transactions).toHaveTransaction({
-            from: alice.address, to: c.address, success: true,
+            from: alice.address, to: c.address, success: false,
         });
         const details = await c.getGetStakeDetails(alice.address, 0n);
-        expect(details!.isActive).toBe(false);
-        expect((await c.getGetTreasuryStatus()).totalStakedUsdt).toBe(0n);
+        expect(details!.isActive).toBe(true);
+        expect((await c.getGetTreasuryStatus()).totalStakedUsdt).toBe(STAKE);
     });
 
     it('keeps the capital when the forwarding policy is turned off', async () => {
