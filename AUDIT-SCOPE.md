@@ -7,12 +7,12 @@ Prepared for external auditors. Everything an auditor needs to quote and start.
 | | |
 |---|---|
 | Contract | `EQBHG-l-XAsYnMGMx8ecP7fU_AM8oSV-r6ZQtYBD4sEGVdPy` (TON mainnet) |
-| Code hash | `4fb7a27304061ad0cf13ce47677759355843a68f93ad07d413b8b62a3c4ae69d` |
-| Source | `contracts/ton_crown.tact` — 2095 lines, Tact |
-| Commit | `0b2111edfbe0ff7dd199638d8db56dff12054dc6` |
-| Repository | https://github.com/Toncrown/contract, branch `claude/ton-contract-refund-bug-3q464f` |
-| Live since | 31 August 2026 |
-| Users / value | 106 users, 222.4 TON of staked principal owed |
+| Code hash | `dd42cb6f7e693c187c985d95797f3721e6eba8c6322b190f79cb3bc234362435` |
+| Source | `contracts/ton_crown.tact` — 2482 lines, Tact |
+| Commit | `77afdab` — the USDT payout-reserve upgrade |
+| Repository | https://github.com/Toncrown/contract, branch `usdt-payout-reserve` |
+| Live since | 31 August 2026; upgraded in place since, most recently for the USDT payout reserve |
+| Users / value | 158 users, 4,078.9 TON and 113 USDT of staked principal owed |
 
 The deployed code hash can be verified against a local build with
 `npx blueprint run identifyDeployed`.

@@ -1,0 +1,22 @@
+# Line endings are decided here rather than by whatever core.autocrlf each machine happens
+# to be set to. Without this, a file written with LF and one written with CRLF both end up
+# in the index as LF, and git narrates every one of them:
+#
+#   warning: LF will be replaced by CRLF in <file>
+#
+# which is noise on every single commit, and hides any warning worth reading.
+#
+# text=auto keeps the repository on LF — the right thing for a repo that CI and non-Windows
+# machines also build — while leaving each working tree to check out whatever suits it. No
+# existing file changes: the index is already LF.
+* text=auto
+
+# Binary files are never converted. A line ending "fixed" inside a PDF or a .boc is a
+# corrupted file, and the corruption is silent.
+*.pdf binary
+*.db  binary
+*.boc binary
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary
